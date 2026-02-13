@@ -21,6 +21,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "lucide-react": [
+        "./shims/lucide-react.tsx"
       ]
     },
     "allowImportingTsExtensions": true,
