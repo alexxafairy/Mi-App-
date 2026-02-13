@@ -6,6 +6,9 @@ import DietSection from './components/DietSection';
 import SummarySection from './components/SummarySection';
 import EvidenceSection from './components/EvidenceSection';
 import { db } from './services/dbService';
+import { Star22, Star8 } from './icons/Stars';
+
+const USER_PHOTO = "https://i.postimg.cc/5yDwTwRh/frente.png";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.DIARY);
@@ -88,10 +91,7 @@ const App: React.FC = () => {
   };
 
   const deleteEvidence = async (entry: EvidenceEntry) => {
-    // 1. Actualización inmediata UI (Optimista)
     setEvidenceEntries(prev => prev.filter(e => String(e.id) !== String(entry.id)));
-
-    // 2. Borrado robusto en nube
     if (isCloudEnabled) {
       setIsSyncing(true);
       try {
@@ -106,19 +106,18 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+      <div className="min-h-screen flex items-center justify-center bg-white/60 backdrop-blur-sm">
         <div className="text-center space-y-6">
           <div className="relative">
-            <div className="w-20 h-20 bg-[var(--main)] border-[4px] border-black rounded-[15px] mx-auto animate-bounce flex items-center justify-center text-4xl shadow-[6px_6px_0px_0px_#000]">
-              📸
+            <div className="w-48 h-48 bg-white border-[6px] border-black rounded-full mx-auto animate-bounce overflow-hidden shadow-[10px_10px_0px_0px_#000]">
+              <img src={USER_PHOTO} alt="Mariana" className="w-full h-full object-cover" />
             </div>
-            <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-white border-[3px] border-black rounded-full flex items-center justify-center animate-pulse text-[10px]">
-              ✨
-            </div>
+            <Star22 className="absolute -top-8 -left-8 animate-spin-slow" size={50} color="var(--theme-2-main)" />
+            <Star8 className="absolute -bottom-6 -right-6 animate-pulse" size={60} color="var(--theme-1-main)" />
           </div>
           <div className="space-y-1">
-            <p className="font-black uppercase tracking-[0.2em] text-sm text-black">Cargando Estudio</p>
-            <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">ClayMinds Studio System</p>
+            <p className="font-black uppercase tracking-[0.2em] text-sm text-black">Preparando tu diario, Mariana</p>
+            <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Acompañamiento Personal</p>
           </div>
         </div>
       </div>
@@ -126,30 +125,37 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pb-24 md:pb-10">
-      <header className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-[var(--main)] border-[3px] border-black shadow-[3px_3px_0px_0px_#000] flex items-center justify-center rounded-[5px]">
-              <span className="text-xl">🎬</span>
+    <div className="min-h-screen pb-24 md:pb-10 relative overflow-hidden">
+      {/* Estrellas decorativas de fondo */}
+      <Star22 className="absolute top-10 -left-10 opacity-10 rotate-12" size={200} color="var(--theme-0-main)" />
+      <Star8 className="absolute bottom-20 -right-20 opacity-10 -rotate-12" size={300} color="var(--theme-2-main)" />
+
+      <header className="max-w-4xl mx-auto px-4 py-8 relative z-10">
+        <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-6">
+          <div className="flex items-center space-x-6">
+            <div className="w-28 h-28 bg-white border-[4px] border-black shadow-[6px_6px_0px_0px_#000] rounded-full overflow-hidden transform -rotate-3 flex-shrink-0">
+              <img src={USER_PHOTO} alt="Mariana" className="w-full h-full object-cover" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-black italic leading-none">ClayMinds</h1>
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40 mt-1">Nutrition & Soul</p>
+            <div className="bg-white/70 backdrop-blur-sm p-4 rounded-[10px] border-2 border-black">
+              <h1 className="text-3xl font-bold tracking-tight text-black italic leading-none relative">
+                El diario de Mariana :)
+                <Star8 className="absolute -top-6 -right-8" size={24} color="var(--theme-2-main)" />
+              </h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mt-2">Cuidado Personal y Bienestar</p>
             </div>
           </div>
-          <div className={`flex items-center space-x-2 bg-white border-2 border-black px-3 py-1 rounded-[5px] shadow-[2px_2px_0px_0px_#000] transition-all ${isSyncing ? 'animate-pulse' : ''}`}>
-             <span className={`w-2 h-2 rounded-full ${isCloudEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-             <span className="text-[9px] font-black uppercase">{isSyncing ? 'Sincronizando...' : 'Conectado'}</span>
+          <div className={`flex items-center space-x-2 bg-white border-2 border-black px-4 py-2 rounded-[5px] shadow-[3px_3px_0px_0px_#000] transition-all ${isSyncing ? 'animate-pulse' : ''}`}>
+             <span className={`w-2.5 h-2.5 rounded-full ${isCloudEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+             <span className="text-[10px] font-black uppercase tracking-widest">{isSyncing ? 'Guardando...' : 'Conectado'}</span>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4">
+      <main className="max-w-4xl mx-auto px-4 relative z-10">
         <div className="flex space-x-3 mb-10 overflow-x-auto pb-4 no-scrollbar">
           <TabButton active={activeTab === AppTab.DIARY} onClick={() => setActiveTab(AppTab.DIARY)} label="DIARIO" icon="📔" />
           <TabButton active={activeTab === AppTab.DIET} onClick={() => setActiveTab(AppTab.DIET)} label="DIETA" icon="🥗" />
-          <TabButton active={activeTab === AppTab.EVIDENCES} onClick={() => setActiveTab(AppTab.EVIDENCES)} label="EVIDENCIAS" icon="📸" />
+          <TabButton active={activeTab === AppTab.EVIDENCES} onClick={() => setActiveTab(AppTab.EVIDENCES)} label="LOGROS" icon="📸" />
           <TabButton active={activeTab === AppTab.SUMMARY} onClick={() => setActiveTab(AppTab.SUMMARY)} label="RESUMEN" icon="📊" />
         </div>
 
