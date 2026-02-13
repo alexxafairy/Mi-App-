@@ -17,7 +17,6 @@
         --shadow: 4px 4px 0px 0px var(--border);
         --radius: 5px;
 
-        /* Theme Variants */
         --theme-0-bg: oklch(96.22% 0.0569 95.61);
         --theme-0-main: oklch(84.08% 0.1725 84.2);
         
@@ -37,10 +36,6 @@
         color: var(--foreground);
         font-weight: 500;
         transition: background-color 0.3s ease;
-      }
-
-      h1, h2, h3, h4, h5, h6 {
-        font-weight: 700;
       }
 
       .clay-card {
@@ -74,11 +69,6 @@
         font-family: inherit;
         font-weight: 500;
         width: 100%;
-      }
-
-      .clay-input:focus {
-        outline: none;
-        background: oklch(98% 0.01 255);
       }
 
       .tab-active {
@@ -123,20 +113,22 @@
         width: 100%;
       }
     </style>
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@19.0.0",
-        "react/": "https://esm.sh/react@19.0.0/",
-        "react-dom": "https://esm.sh/react-dom@19.0.0",
-        "react-dom/": "https://esm.sh/react-dom@19.0.0/",
-        "recharts": "https://esm.sh/recharts@2.15.0?external=react,react-dom",
-        "@google/genai": "https://esm.sh/@google/genai@1.41.0"
-      }
-    }
-    </script>
-  </head>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
+    "vite": "https://esm.sh/vite@^7.3.1"
+  }
+}
+</script>
+</head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
