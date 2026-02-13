@@ -197,7 +197,6 @@ class DatabaseService {
 
       if (!response.ok) {
         console.error('Existence check failed:', await response.text());
-        // Conservador: si no podemos validar, asumimos que sigue existiendo.
         return true;
       }
 
@@ -206,20 +205,15 @@ class DatabaseService {
     };
 
     try {
-      // 1. Intentar borrar por ID
       const idQuery = `id=eq.${encodeURIComponent(String(entry.id))}`;
       await tryDelete(idQuery);
-      
-      // 2. Verificar si sigue existiendo por URL (por si el ID cambió al sincronizar)
       const stillExistsAfterIdDelete = await existsByPhotoUrl(entry.photo_url);
       if (!stillExistsAfterIdDelete) return true;
 
-      // 3. Fallback: Borrar por URL de foto
       const photoQuery = `photo_url=eq.${encodeURIComponent(entry.photo_url)}`;
       const photoDeleted = await tryDelete(photoQuery);
       if (!photoDeleted) return false;
 
-      // 4. Verificación final
       const stillExistsAfterPhotoDelete = await existsByPhotoUrl(entry.photo_url);
       return !stillExistsAfterPhotoDelete;
     } catch (e) {

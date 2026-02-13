@@ -2,10 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { DietPlan, DiaryEntry } from "../types";
 
-// Usamos una función para obtener la instancia y evitar errores de inicialización si la key no está lista
+// Always initialize with apiKey from process.env.API_KEY as required by guidelines
 const getAI = () => {
-  const key = (typeof process !== 'undefined' && process.env?.API_KEY) ? process.env.API_KEY : '';
-  return new GoogleGenAI({ apiKey: key });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 export const parseDietFromText = async (text: string): Promise<DietPlan> => {
@@ -48,6 +47,7 @@ export const parseDietFromText = async (text: string): Promise<DietPlan> => {
   });
 
   try {
+    // Access .text property directly as it is not a method
     return JSON.parse(response.text || '{}');
   } catch (e) {
     console.error("Failed to parse diet JSON", e);
@@ -69,5 +69,68 @@ export const getDiaryInsight = async (entry: DiaryEntry): Promise<string> => {
     }
   });
 
+  // Access .text property directly as it is not a method
   return response.text || "Gracias por compartir esto conmigo. Estoy aquí para escucharte.";
+};
+
+/**
+ * Stop-Motion Director workflow:
+ * Step 1: Generate scene image with gemini-2.5-flash-image (Nano Banana).
+ * Step 2: Generate stop-motion video with veo-3.1-fast-generate-preview (Veo).
+ */
+export const generateClaymationVideo = async (task: string): Promise<string> => {
+  const ai = getAI();
+
+  // Paso 1: Generar la Imagen (Nano Banana)
+  const imageResponse = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: {
+      parts: [{
+        text: `Hand-crafted Claymation of: ${task}. Cute character, vibrant colors, visible clay fingerprints and tools marks, studio lighting, vertical 9:16 aspect ratio, centered subject.`
+      }]
+    },
+    config: {
+      imageConfig: {
+        aspectRatio: "9:16"
+      }
+    }
+  });
+
+  let base64Image = '';
+  if (imageResponse.candidates && imageResponse.candidates[0].content.parts) {
+    for (const part of imageResponse.candidates[0].content.parts) {
+      if (part.inlineData) {
+        base64Image = part.inlineData.data;
+        break;
+      }
+    }
+  }
+
+  if (!base64Image) throw new Error("Could not generate scene image.");
+
+  // Paso 2: Generar el Video (Veo)
+  let operation = await ai.models.generateVideos({
+    model: 'veo-3.1-fast-generate-preview',
+    prompt: `A cute stop-motion animation of ${task} in claymation style, playful and tactile movement at 12fps.`,
+    image: {
+      imageBytes: base64Image,
+      mimeType: 'image/png'
+    },
+    config: {
+      numberOfVideos: 1,
+      resolution: '720p',
+      aspectRatio: '9:16'
+    }
+  });
+
+  while (!operation.done) {
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    operation = await ai.operations.getVideosOperation({ operation: operation });
+  }
+
+  const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+  if (!downloadLink) throw new Error("Video generation failed.");
+  
+  // Append API key when fetching from the download link as required
+  return `${downloadLink}&key=${process.env.API_KEY}`;
 };

@@ -4,6 +4,7 @@ import { EvidenceEntry } from '../types';
 import { db } from '../services/dbService';
 import { Star8, Star22 } from '../icons/Stars';
 import { ChevronDown, Plus, CheckCircle2, Image as ImageIcon, Trash2, Calendar } from 'lucide-react';
+import { generateClaymationVideo } from '../services/geminiService';
 
 interface Props {
   entries: EvidenceEntry[];
@@ -28,6 +29,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [animatingId, setAnimatingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleRefresh = async () => {
@@ -79,7 +81,6 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
     try {
       shouldDelete = window.confirm("¿Eliminar esta toma de la película? No se puede deshacer.");
     } catch {
-      // En algunos contextos de navegador/webviews, confirm podría fallar
       shouldDelete = true;
     }
 
@@ -88,8 +89,33 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
     }
   };
 
-  const handleGenerateAnim = (task: string) => {
-    alert(`¡Director! Preparando el set de arcilla para animar tu logro: "${task}".`);
+  const handleGenerateAnim = async (entryId: string, task: string) => {
+    // Check if API key is selected as per Veo requirements
+    const aistudio = (window as any).aistudio;
+    if (aistudio && typeof aistudio.hasSelectedApiKey === 'function') {
+      const hasKey = await aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        alert("¡Hola Directora Mariana! Para animar tus logros con Veo, necesitas seleccionar una clave de API pagada. Visita: ai.google.dev/gemini-api/docs/billing");
+        await aistudio.openSelectKey();
+        // Proceeding assumes success after triggering selection as per guidelines
+      }
+    }
+
+    setAnimatingId(entryId);
+    try {
+      const videoUrl = await generateClaymationVideo(task);
+      window.open(videoUrl, '_blank');
+    } catch (err: any) {
+      console.error(err);
+      if (err.message && err.message.includes("Requested entity was not found")) {
+        alert("Hubo un problema con la clave de API. Por favor, selecciónala de nuevo.");
+        if (aistudio) await aistudio.openSelectKey();
+      } else {
+        alert("¡Ups! Hubo un error en el set de plastilina. Por favor intenta de nuevo.");
+      }
+    } finally {
+      setAnimatingId(null);
+    }
   };
 
   return (
@@ -242,29 +268,30 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                    <Star8 size={10} color="var(--theme-1-main)" /> {new Date(entry.created_at).toLocaleDateString()}
                 </div>
                 
-                {/* Contenedor de botones para borrado y animación */}
                 <div className="absolute bottom-4 right-4 flex space-x-2 z-[60] transition-all">
                   <button 
                     type="button"
+                    disabled={animatingId === String(entry.id)}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       confirmDelete(entry);
                     }}
-                    className="bg-red-500 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all cursor-pointer touch-manipulation"
+                    className="bg-red-500 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all cursor-pointer touch-manipulation disabled:opacity-50"
                   >
                     <Trash2 size={20} color="white" />
                   </button>
                   <button 
                     type="button"
+                    disabled={animatingId === String(entry.id)}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handleGenerateAnim(entry.task_name);
+                      handleGenerateAnim(String(entry.id), entry.task_name);
                     }}
-                    className="bg-amber-400 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all cursor-pointer touch-manipulation"
+                    className={`bg-amber-400 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all cursor-pointer touch-manipulation ${animatingId === String(entry.id) ? 'animate-pulse' : ''}`}
                   >
-                    <span className="text-xl">🎬</span>
+                    <span className="text-xl">{animatingId === String(entry.id) ? '⏳' : '🎬'}</span>
                   </button>
                 </div>
               </div>

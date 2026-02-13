@@ -18,6 +18,7 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "lucide-react": ["./shims/lucide-react.tsx"],
       "*": ["node_modules/*"]
     }
   },
