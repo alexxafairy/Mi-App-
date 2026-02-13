@@ -2,9 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { DietPlan, DiaryEntry } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Usamos una función para obtener la instancia y evitar errores de inicialización si la key no está lista
+const getAI = () => {
+  const key = (typeof process !== 'undefined' && process.env?.API_KEY) ? process.env.API_KEY : '';
+  return new GoogleGenAI({ apiKey: key });
+};
 
 export const parseDietFromText = async (text: string): Promise<DietPlan> => {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Analyze this doctor-prescribed diet text and organize it into a structured meal schedule with dishes and ingredients. 
@@ -51,6 +56,7 @@ export const parseDietFromText = async (text: string): Promise<DietPlan> => {
 };
 
 export const getDiaryInsight = async (entry: DiaryEntry): Promise<string> => {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `As a supportive psychological companion, analyze this diary entry (in Spanish) and provide a brief, warm, and empathetic insight. Focus on helping the user identify cognitive distortions in their automatic thoughts.
