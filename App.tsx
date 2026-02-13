@@ -14,7 +14,7 @@ const App: React.FC = () => {
   const DELETED_EVIDENCE_URLS_KEY = 'clayminds_deleted_evidence_urls';
   const DIARY_CACHE_KEY = 'clayminds_diary_cache';
   const DIET_CACHE_KEY = 'clayminds_diet_cache';
-  
+
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.DIARY);
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
@@ -82,11 +82,12 @@ const App: React.FC = () => {
       const cloudDiet = await db.fetchFromCloud('diet');
       const cloudEvidences = await db.fetchFromCloud('evidences');
       
-      if (cloudDiary) {
+      // Protección: Solo sobrescribir cache si la nube tiene datos o si el cache está vacío
+      if (Array.isArray(cloudDiary) && (cloudDiary.length > 0 || finalDiary.length === 0)) {
         finalDiary = cloudDiary;
         writeDiaryCache(cloudDiary);
       }
-      if (cloudDiet) {
+      if (cloudDiet !== null) {
         finalDiet = cloudDiet;
         writeDietCache(cloudDiet);
       }

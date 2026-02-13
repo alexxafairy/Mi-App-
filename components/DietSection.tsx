@@ -36,8 +36,8 @@ const DietSection: React.FC<Props> = ({ plan, onUpdate }) => {
       onUpdate(result);
       setIsEditing(false);
       setShowContent(false);
-    } catch (err) {
-      alert("Error al procesar la dieta.");
+    } catch (err: any) {
+      alert(err?.message || "Error al procesar la dieta.");
     } finally {
       setIsLoading(false);
     }
@@ -104,7 +104,6 @@ const DietSection: React.FC<Props> = ({ plan, onUpdate }) => {
               return (
                 <div 
                   key={idx} 
-                  // Merged duplicate style attributes into a single style object
                   style={{ 
                     animationDelay: `${idx * 100}ms`,
                     borderColor: item.completed ? '#000' : 'black',

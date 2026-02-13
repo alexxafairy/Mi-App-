@@ -7,7 +7,101 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
+const MEAL_KEYWORDS = ['desayuno', 'comida', 'cena', 'colación', 'colacion', 'snack', 'almuerzo'];
+
+const mapMealCategory = (label: string): 'breakfast' | 'snack' | 'lunch' | 'dinner' | 'other' => {
+  const v = label.toLowerCase();
+  if (v.includes('desayuno')) return 'breakfast';
+  if (v.includes('colación') || v.includes('colacion') || v.includes('snack')) return 'snack';
+  if (v.includes('comida') || v.includes('almuerzo')) return 'lunch';
+  if (v.includes('cena')) return 'dinner';
+  return 'other';
+};
+
+/**
+ * Parser determinista local para formatos estructurados en texto plano.
+ * Útil para dietas con formato "DÍA X / SEMANA Y / Comida: ..."
+ */
+const parseDietStructuredText = (text: string): DietPlan | null => {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+
+  const schedule: DietPlan['schedule'] = [];
+  let currentDay = '';
+  let currentMealLabel = '';
+  let currentMealLines: string[] = [];
+
+  const flushMeal = () => {
+    if (!currentMealLabel || currentMealLines.length === 0) return;
+    const description = currentMealLines.join(' ').replace(/\s+/g, ' ').trim();
+    const firstIngredient = currentMealLines[0] || description;
+    const ingredients = description
+      .split(/[,+]/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    const dayPrefix = currentDay ? `${currentDay} · ` : '';
+    schedule.push({
+      time: `${dayPrefix}${currentMealLabel}`,
+      dish: firstIngredient,
+      description,
+      category: mapMealCategory(currentMealLabel),
+      ingredients: ingredients.length > 0 ? ingredients : [description],
+      completed: false,
+    });
+
+    currentMealLabel = '';
+    currentMealLines = [];
+  };
+
+  for (const line of lines) {
+    // Detectar DÍA
+    const dayMatch = line.match(/D[IÍ]A\s*\d+/i);
+    if (dayMatch) {
+      flushMeal();
+      currentDay = dayMatch[0].toUpperCase();
+      continue;
+    }
+
+    // Detectar Comida (keywords)
+    const maybeMeal = line.replace(':', '').trim().toLowerCase();
+    if (MEAL_KEYWORDS.some(k => maybeMeal === k || maybeMeal.startsWith(`${k} `))) {
+      flushMeal();
+      currentMealLabel = line.replace(':', '').trim();
+      continue;
+    }
+
+    // Ignorar líneas de cabecera tipo SEMANA o separadores visuales
+    if (line.match(/^⚡|^🔥|^SEMANA/i)) {
+      flushMeal();
+      continue;
+    }
+
+    // Si tenemos una comida activa, acumular contenido
+    if (currentMealLabel) {
+      currentMealLines.push(line);
+    }
+  }
+
+  flushMeal();
+
+  if (schedule.length === 0) return null;
+
+  return {
+    name: 'Plan nutricional personalizado',
+    schedule,
+    recommendations: [
+      'Mantén buena hidratación durante el día.',
+      'Ajusta porciones con tu especialista según evolución.',
+    ],
+  };
+};
+
 export const parseDietFromText = async (text: string): Promise<DietPlan> => {
+  // Intentar primero parseo manual si el formato es muy estándar
+  const parsedManual = parseDietStructuredText(text);
+  if (parsedManual && parsedManual.schedule.length > 5) return parsedManual;
+
   const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -47,11 +141,26 @@ export const parseDietFromText = async (text: string): Promise<DietPlan> => {
   });
 
   try {
-    // Access .text property directly as it is not a method
-    return JSON.parse(response.text || '{}');
+    const parsed = JSON.parse(response.text || '{}');
+    return {
+      name: parsed?.name || 'Plan nutricional generado',
+      schedule: Array.isArray(parsed?.schedule)
+        ? parsed.schedule.map((meal: any) => ({
+            time: meal?.time || 'Sin horario',
+            dish: meal?.dish || 'Comida sugerida',
+            description: meal?.description || meal?.dish || 'Sin descripción',
+            category: meal?.category || 'other',
+            ingredients: Array.isArray(meal?.ingredients) && meal.ingredients.length > 0
+              ? meal.ingredients
+              : [meal?.dish || 'Ingrediente no especificado'],
+            completed: false
+          }))
+        : [],
+      recommendations: Array.isArray(parsed?.recommendations) ? parsed.recommendations : [],
+    };
   } catch (e) {
     console.error("Failed to parse diet JSON", e);
-    throw new Error("Could not understand the diet text. Please try describing it differently.");
+    throw new Error("No pudimos procesar el texto de la dieta. Por favor, intenta pegarla con un formato más claro (ej: Desayuno: ...)");
   }
 };
 
@@ -69,19 +178,15 @@ export const getDiaryInsight = async (entry: DiaryEntry): Promise<string> => {
     }
   });
 
-  // Access .text property directly as it is not a method
   return response.text || "Gracias por compartir esto conmigo. Estoy aquí para escucharte.";
 };
 
 /**
- * Stop-Motion Director workflow:
- * Step 1: Generate scene image with gemini-2.5-flash-image (Nano Banana).
- * Step 2: Generate stop-motion video with veo-3.1-fast-generate-preview (Veo).
+ * Stop-Motion Director workflow
  */
 export const generateClaymationVideo = async (task: string): Promise<string> => {
   const ai = getAI();
 
-  // Paso 1: Generar la Imagen (Nano Banana)
   const imageResponse = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
@@ -108,7 +213,6 @@ export const generateClaymationVideo = async (task: string): Promise<string> => 
 
   if (!base64Image) throw new Error("Could not generate scene image.");
 
-  // Paso 2: Generar el Video (Veo)
   let operation = await ai.models.generateVideos({
     model: 'veo-3.1-fast-generate-preview',
     prompt: `A cute stop-motion animation of ${task} in claymation style, playful and tactile movement at 12fps.`,
@@ -131,6 +235,5 @@ export const generateClaymationVideo = async (task: string): Promise<string> => 
   const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
   if (!downloadLink) throw new Error("Video generation failed.");
   
-  // Append API key when fetching from the download link as required
   return `${downloadLink}&key=${process.env.API_KEY}`;
 };
