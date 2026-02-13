@@ -12,6 +12,9 @@ const USER_PHOTO = "https://i.postimg.cc/5yDwTwRh/frente.png";
 
 const App: React.FC = () => {
   const DELETED_EVIDENCE_URLS_KEY = 'clayminds_deleted_evidence_urls';
+  const DIARY_CACHE_KEY = 'clayminds_diary_cache';
+  const DIET_CACHE_KEY = 'clayminds_diet_cache';
+  
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.DIARY);
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
@@ -34,20 +37,59 @@ const App: React.FC = () => {
     localStorage.setItem(DELETED_EVIDENCE_URLS_KEY, JSON.stringify(Array.from(urls)));
   };
 
+  const readDiaryCache = (): DiaryEntry[] => {
+    try {
+      const raw = localStorage.getItem(DIARY_CACHE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const writeDiaryCache = (entries: DiaryEntry[]) => {
+    localStorage.setItem(DIARY_CACHE_KEY, JSON.stringify(entries));
+  };
+
+  const readDietCache = (): DietPlan | null => {
+    try {
+      const raw = localStorage.getItem(DIET_CACHE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  const writeDietCache = (plan: DietPlan | null) => {
+    if (!plan) {
+      localStorage.removeItem(DIET_CACHE_KEY);
+      return;
+    }
+    localStorage.setItem(DIET_CACHE_KEY, JSON.stringify(plan));
+  };
+
   const initApp = async () => {
     const cloudConfig = db.getConfig();
     setIsCloudEnabled(cloudConfig.enabled);
 
-    let finalDiary: DiaryEntry[] = [];
-    let finalDiet: DietPlan | null = null;
+    let finalDiary: DiaryEntry[] = readDiaryCache();
+    let finalDiet: DietPlan | null = readDietCache();
     let finalEvidences: EvidenceEntry[] = [];
 
     if (cloudConfig.enabled && cloudConfig.url) {
       const cloudDiary = await db.fetchFromCloud('diary');
       const cloudDiet = await db.fetchFromCloud('diet');
       const cloudEvidences = await db.fetchFromCloud('evidences');
-      if (cloudDiary) finalDiary = cloudDiary;
-      if (cloudDiet) finalDiet = cloudDiet;
+      
+      if (cloudDiary) {
+        finalDiary = cloudDiary;
+        writeDiaryCache(cloudDiary);
+      }
+      if (cloudDiet) {
+        finalDiet = cloudDiet;
+        writeDietCache(cloudDiet);
+      }
       if (cloudEvidences) finalEvidences = cloudEvidences;
     }
 
@@ -66,6 +108,7 @@ const App: React.FC = () => {
 
   const saveDiary = async (newEntries: DiaryEntry[]) => {
     setDiaryEntries(newEntries);
+    writeDiaryCache(newEntries);
     if (isCloudEnabled) {
       setIsSyncing(true);
       await db.syncToCloud('diary', newEntries);
@@ -74,7 +117,11 @@ const App: React.FC = () => {
   };
 
   const deleteDiaryEntry = async (id: string) => {
-    setDiaryEntries(prev => prev.filter(e => e.id !== id));
+    setDiaryEntries(prev => {
+      const updated = prev.filter(e => e.id !== id);
+      writeDiaryCache(updated);
+      return updated;
+    });
     if (isCloudEnabled) {
       setIsSyncing(true);
       await db.deleteFromCloud('diary', id);
@@ -84,6 +131,7 @@ const App: React.FC = () => {
 
   const saveDiet = async (plan: DietPlan) => {
     setDietPlan(plan);
+    writeDietCache(plan);
     if (isCloudEnabled) {
       setIsSyncing(true);
       await db.syncToCloud('diet', plan);

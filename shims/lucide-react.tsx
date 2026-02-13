@@ -81,17 +81,31 @@ export const Sparkles = makeIcon(
   </>
 );
 
-// Added icons with proper fragment wrapping for multiple paths/shapes
 export const ChevronDown = makeIcon(<path d="m6 9 6 6 6-6"/>);
 
-// Fix: Wrap multiple children in a fragment to satisfy the single-argument requirement of makeIcon
-export const CheckCircle2 = makeIcon(<><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></>);
+export const CheckCircle2 = makeIcon(
+  <>
+    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+    <path d="m9 12 2 2 4-4"/>
+  </>
+);
 
-// Fix: Wrap multiple children in a fragment to satisfy the single-argument requirement of makeIcon
-export const Image = makeIcon(<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></>);
+export const Image = makeIcon(
+  <>
+    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+    <circle cx="9" cy="9" r="2"/>
+    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+  </>
+);
 
-// Fix: Wrap multiple children in a fragment to satisfy the single-argument requirement of makeIcon
-export const Calendar = makeIcon(<><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>);
+export const Calendar = makeIcon(
+  <>
+    <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+    <line x1="16" x2="16" y1="2" y2="6"/>
+    <line x1="8" x2="8" y1="2" y2="6"/>
+    <line x1="3" x2="21" y1="10" y2="10"/>
+  </>
+);
 
 export default {
   Trash2,
