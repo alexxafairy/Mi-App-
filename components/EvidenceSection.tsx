@@ -75,15 +75,21 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
   };
 
   const confirmDelete = (entry: EvidenceEntry) => {
-    let shouldDelete = false;
+    let shouldDelete = true;
     try {
       shouldDelete = window.confirm("¿Eliminar esta toma de la película? No se puede deshacer.");
     } catch {
+      // En algunos contextos de navegador/webviews, confirm podría fallar
       shouldDelete = true;
     }
+
     if (shouldDelete) {
       onDelete(entry);
     }
+  };
+
+  const handleGenerateAnim = (task: string) => {
+    alert(`¡Director! Preparando el set de arcilla para animar tu logro: "${task}".`);
   };
 
   return (
@@ -107,7 +113,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
           onClick={() => setIsAdding(!isAdding)} 
           className={`clay-button ${isAdding ? 'bg-red-400' : 'bg-amber-400'} px-8 py-3 shadow-[5px_5px_0px_0px_#000] text-sm flex items-center gap-2`}
         >
-          {isAdding ? 'CANCELAR' : <><Plus size={18} strokeWidth={3} /> REGISTRAR LOGRO</>}
+          {isAdding ? 'CANCELAR' : <><Plus size={18} strokeWidth={3} /> REGISTRAR ESCENA</>}
         </button>
       </div>
 
@@ -236,7 +242,8 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                    <Star8 size={10} color="var(--theme-1-main)" /> {new Date(entry.created_at).toLocaleDateString()}
                 </div>
                 
-                <div className="absolute bottom-4 right-4 z-[60]">
+                {/* Contenedor de botones para borrado y animación */}
+                <div className="absolute bottom-4 right-4 flex space-x-2 z-[60] transition-all">
                   <button 
                     type="button"
                     onClick={(e) => {
@@ -244,9 +251,20 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                       e.stopPropagation();
                       confirmDelete(entry);
                     }}
-                    className="bg-red-500 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:bg-red-600 active:translate-y-1 active:shadow-none transition-all cursor-pointer touch-manipulation"
+                    className="bg-red-500 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all cursor-pointer touch-manipulation"
                   >
                     <Trash2 size={20} color="white" />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleGenerateAnim(entry.task_name);
+                    }}
+                    className="bg-amber-400 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all cursor-pointer touch-manipulation"
+                  >
+                    <span className="text-xl">🎬</span>
                   </button>
                 </div>
               </div>

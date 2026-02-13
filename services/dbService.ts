@@ -169,7 +169,7 @@ class DatabaseService {
     }
   }
 
-  async deleteEvidence(entry: EvidenceEntry): Promise<boolean> {
+  async deleteEvidence(entry: EvidenceEntry) {
     if (!this.config.enabled || !this.config.url) return true;
 
     const tryDelete = async (query: string) => {
@@ -186,20 +186,42 @@ class DatabaseService {
         return false;
       }
 
-      // Si el status es OK (incluyendo 204 No Content), consideramos éxito.
-      // Incluso si regresa [], confiamos en el status del servidor para evitar falsos negativos.
-      return true;
+      return response.status === 204 || response.status === 200;
+    };
+
+    const existsByPhotoUrl = async (photoUrl: string) => {
+      const response = await fetch(
+        `${this.config.url}/rest/v1/evidences?select=id&photo_url=eq.${encodeURIComponent(photoUrl)}&limit=1`,
+        { headers: this.getHeaders() }
+      );
+
+      if (!response.ok) {
+        console.error('Existence check failed:', await response.text());
+        // Conservador: si no podemos validar, asumimos que sigue existiendo.
+        return true;
+      }
+
+      const rows = await response.json().catch(() => []);
+      return Array.isArray(rows) && rows.length > 0;
     };
 
     try {
-      // Intentamos por ID
+      // 1. Intentar borrar por ID
       const idQuery = `id=eq.${encodeURIComponent(String(entry.id))}`;
-      const idDeleted = await tryDelete(idQuery);
-      if (idDeleted) return true;
+      await tryDelete(idQuery);
+      
+      // 2. Verificar si sigue existiendo por URL (por si el ID cambió al sincronizar)
+      const stillExistsAfterIdDelete = await existsByPhotoUrl(entry.photo_url);
+      if (!stillExistsAfterIdDelete) return true;
 
-      // Respaldo por URL de foto si el ID local no coincide con el de la DB
+      // 3. Fallback: Borrar por URL de foto
       const photoQuery = `photo_url=eq.${encodeURIComponent(entry.photo_url)}`;
-      return await tryDelete(photoQuery);
+      const photoDeleted = await tryDelete(photoQuery);
+      if (!photoDeleted) return false;
+
+      // 4. Verificación final
+      const stillExistsAfterPhotoDelete = await existsByPhotoUrl(entry.photo_url);
+      return !stillExistsAfterPhotoDelete;
     } catch (e) {
       console.error('Delete evidence error:', e);
       return false;

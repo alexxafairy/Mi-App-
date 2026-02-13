@@ -91,31 +91,27 @@ const App: React.FC = () => {
   };
 
   const deleteEvidence = async (entry: EvidenceEntry) => {
-    // 1. Borrado Optimista (Actualizamos UI de inmediato)
+    // 1. Actualizamos UI inmediatamente (Borrado Optimista)
     setEvidenceEntries(prev => prev.filter(e => String(e.id) !== String(entry.id)));
 
-    // 2. Intentamos persistir en la nube
+    // 2. Borramos en segundo plano
     if (isCloudEnabled) {
       setIsSyncing(true);
       try {
-        const success = await db.deleteEvidence(entry);
-        if (!success) {
-          // Si el servidor dio error real, restauramos la UI
-          setEvidenceEntries(prev => {
-             const exists = prev.some(e => String(e.id) === String(entry.id));
-             if (exists) return prev;
-             return [entry, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          });
+        const deleted = await db.deleteEvidence(entry);
+        if (!deleted) {
+          // Si backend no borró nada, restauramos para evitar "borrado fantasma".
+          setEvidenceEntries(prev => (prev.some(e => String(e.id) === String(entry.id)) ? prev : [entry, ...prev]));
           alert('No se pudo borrar permanentemente de la nube. Por favor, intenta de nuevo o sincroniza tu estudio.');
+        } else {
+          // Confirmamos estado real desde nube para evitar que reaparezca al refrescar.
+          const cloudEvidences = await db.fetchFromCloud('evidences');
+          if (cloudEvidences) setEvidenceEntries(cloudEvidences);
         }
       } catch (e) {
         console.error("Error al borrar en nube:", e);
-        // Rollback por error de conexión
-        setEvidenceEntries(prev => {
-          const exists = prev.some(e => String(e.id) === String(entry.id));
-          if (exists) return prev;
-          return [entry, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        });
+        // Fallback: restaurar entrada si hubo error de red
+        setEvidenceEntries(prev => (prev.some(e => String(e.id) === String(entry.id)) ? prev : [entry, ...prev]));
       } finally {
         setIsSyncing(false);
       }
