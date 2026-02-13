@@ -1,0 +1,8 @@
+{
+  "name": "ClayMinds: Nutrition & Mindfulness",
+  "description": "A holistic companion for managing your doctor-prescribed diet and psychological well-being. Features a structured claymation-inspired diary and diet scheduler.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

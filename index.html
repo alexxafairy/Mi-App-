@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClayMinds - Neo-Brutalist Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --background: oklch(93.46% 0.0305 255.11);
+        --secondary-background: oklch(100% 0 0);
+        --foreground: oklch(0% 0 0);
+        --main: oklch(67.47% 0.1726 259.49);
+        --border: #000000;
+        --shadow: 4px 4px 0px 0px var(--border);
+        --radius: 5px;
+
+        /* Theme Variants */
+        --theme-0-bg: oklch(96.22% 0.0569 95.61);
+        --theme-0-main: oklch(84.08% 0.1725 84.2);
+        
+        --theme-1-bg: oklch(95.31% 0.0496 169.04);
+        --theme-1-main: oklch(77.54% 0.1681 162.78);
+        
+        --theme-2-bg: oklch(93.88% 0.033 300.19);
+        --theme-2-main: oklch(70.28% 0.1753 295.36);
+        
+        --theme-3-bg: oklch(93.46% 0.0305 255.11);
+        --theme-3-main: oklch(67.47% 0.1726 259.49);
+      }
+
+      body {
+        font-family: 'Quicksand', sans-serif;
+        background-color: var(--background);
+        color: var(--foreground);
+        font-weight: 500;
+        transition: background-color 0.3s ease;
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+        font-weight: 700;
+      }
+
+      .clay-card {
+        background: var(--secondary-background);
+        border: 3px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        transition: transform 0.1s ease, background-color 0.2s ease, opacity 0.3s ease;
+      }
+
+      .clay-button {
+        background: var(--main);
+        color: #000;
+        border: 3px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        font-weight: 700;
+        transition: all 0.1s ease;
+      }
+
+      .clay-button:active {
+        transform: translate(2px, 2px);
+        box-shadow: 2px 2px 0px 0px var(--border);
+      }
+
+      .clay-input {
+        background: white;
+        border: 3px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+        font-family: inherit;
+        font-weight: 500;
+        width: 100%;
+      }
+
+      .clay-input:focus {
+        outline: none;
+        background: oklch(98% 0.01 255);
+      }
+
+      .tab-active {
+        background: var(--main) !important;
+        box-shadow: 2px 2px 0px 0px var(--border) !important;
+        transform: translate(2px, 2px);
+      }
+
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-in {
+        animation: slideIn 0.2s ease-out forwards;
+      }
+
+      @keyframes popIn {
+        0% { transform: scale(0.9); opacity: 0; }
+        70% { transform: scale(1.05); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .meal-card-stagger {
+        animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        opacity: 0;
+      }
+
+      .completed-line {
+        position: relative;
+      }
+      .completed-line::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 55%;
+        width: 0;
+        height: 3px;
+        background: currentColor;
+        transition: width 0.4s ease-in-out;
+        pointer-events: none;
+      }
+      .completed-line.is-active::after {
+        width: 100%;
+      }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.0.0",
+        "react/": "https://esm.sh/react@19.0.0/",
+        "react-dom": "https://esm.sh/react-dom@19.0.0",
+        "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+        "recharts": "https://esm.sh/recharts@2.15.0?external=react,react-dom",
+        "@google/genai": "https://esm.sh/@google/genai@1.41.0"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
