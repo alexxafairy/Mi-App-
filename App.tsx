@@ -74,23 +74,28 @@ const App: React.FC = () => {
     setEvidenceEntries(prev => [entry, ...prev]);
     if (isCloudEnabled) {
       setIsSyncing(true);
-      await db.syncToCloud('evidences', entry);
-      setIsSyncing(false);
+      try {
+        const savedEntry = await db.createEvidence(entry);
+        if (savedEntry) {
+          setEvidenceEntries(prev => prev.map(e => (e.id === entry.id ? savedEntry : e)));
+        }
+      } catch (err) {
+        console.error("Error guardando evidencia:", err);
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
-  const deleteEvidence = async (id: string) => {
-    // 1. Actualizamos UI inmediatamente
-    setEvidenceEntries(prev => {
-      const filtered = prev.filter(e => e.id !== id);
-      return [...filtered]; // Creamos nueva referencia de array
-    });
+  const deleteEvidence = async (entry: EvidenceEntry) => {
+    // 1. Actualización inmediata UI (Optimista)
+    setEvidenceEntries(prev => prev.filter(e => String(e.id) !== String(entry.id)));
 
-    // 2. Borramos en segundo plano
+    // 2. Borrado robusto en nube
     if (isCloudEnabled) {
       setIsSyncing(true);
       try {
-        await db.deleteFromCloud('evidences', id);
+        await db.deleteEvidence(entry);
       } catch (e) {
         console.error("Error al borrar en nube:", e);
       } finally {

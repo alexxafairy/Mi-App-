@@ -6,7 +6,7 @@ import { db } from '../services/dbService';
 interface Props {
   entries: EvidenceEntry[];
   onAdd: (entry: EvidenceEntry) => void;
-  onDelete: (id: string) => void;
+  onDelete: (entry: EvidenceEntry) => void;
   onRefresh: () => void;
 }
 
@@ -58,10 +58,16 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
     }
   };
 
-  const confirmDelete = (id: string) => {
-    // Usamos window.confirm para pausar la ejecución y asegurar captura
-    if (window.confirm("¿Eliminar esta toma de la película? No se puede deshacer.")) {
-      onDelete(id);
+  const confirmDelete = (entry: EvidenceEntry) => {
+    let shouldDelete = true;
+    try {
+      shouldDelete = window.confirm("¿Eliminar esta toma de la película? No se puede deshacer.");
+    } catch {
+      shouldDelete = true;
+    }
+
+    if (shouldDelete) {
+      onDelete(entry);
     }
   };
 
@@ -152,19 +158,26 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                 {new Date(entry.created_at).toLocaleDateString()}
               </div>
               
-              {/* Contenedor de botones con z-index alto para evitar solapamientos */}
-              <div className="absolute bottom-3 right-3 flex space-x-2 z-20 md:opacity-0 md:group-hover:opacity-100 transition-all">
+              <div className="absolute bottom-3 right-3 flex space-x-2 z-[60] transition-all">
                 <button 
                   type="button"
-                  onClick={() => confirmDelete(entry.id)}
-                  className="bg-red-500 border-2 border-black p-3 rounded-full shadow-[2px_2px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all flex items-center justify-center"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    confirmDelete(entry);
+                  }}
+                  className="bg-red-500 border-2 border-black p-3 rounded-full shadow-[2px_2px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all flex items-center justify-center cursor-pointer touch-manipulation"
                 >
                   <span className="text-lg">🗑️</span>
                 </button>
                 <button 
                   type="button"
-                  onClick={() => handleGenerateAnim(entry.task_name)}
-                  className="bg-amber-400 border-2 border-black p-3 rounded-full shadow-[2px_2px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all flex items-center justify-center"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleGenerateAnim(entry.task_name);
+                  }}
+                  className="bg-amber-400 border-2 border-black p-3 rounded-full shadow-[2px_2px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all flex items-center justify-center cursor-pointer touch-manipulation"
                 >
                   <span className="text-lg">🎬</span>
                 </button>

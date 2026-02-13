@@ -122,9 +122,9 @@ class DatabaseService {
           fecha: d.fecha,
           situacion: d.situacion,
           emociones: d.emociones,
-          pensamientosAutomaticos: d.pensamientos_automaticos,
+          pensamientos_automaticos: d.pensamientosAutomaticos,
           insight: d.insight,
-          createdAt: d.created_at_val || Date.now()
+          created_at_val: d.createdAt
         })).sort((a: any, b: any) => b.createdAt - a.createdAt);
       }
       
@@ -132,6 +132,66 @@ class DatabaseService {
     } catch (e) {
       console.error(`Exception fetching ${table}:`, e);
       return table === 'diet' ? null : [];
+    }
+  }
+
+  async createEvidence(entry: EvidenceEntry): Promise<EvidenceEntry | null> {
+    if (!this.config.enabled || !this.config.url) return entry;
+
+    try {
+      const response = await fetch(`${this.config.url}/rest/v1/evidences`, {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(entry)
+      });
+
+      if (!response.ok) {
+        console.error('Create evidence error:', await response.text());
+        return null;
+      }
+
+      const data = await response.json();
+      const saved = data?.[0];
+      if (!saved) return null;
+
+      return {
+        id: saved.id,
+        task_name: saved.task_name,
+        photo_url: saved.photo_url,
+        created_at: saved.created_at
+      };
+    } catch (e) {
+      console.error('Create evidence exception:', e);
+      return null;
+    }
+  }
+
+  async deleteEvidence(entry: EvidenceEntry) {
+    if (!this.config.enabled || !this.config.url) return true;
+
+    const tryDelete = async (query: string) => {
+      const response = await fetch(`${this.config.url}/rest/v1/evidences?${query}`, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      return response.ok;
+    };
+
+    try {
+      // Intento 1: Por ID (numérico o string)
+      const idQuery = `id=eq.${encodeURIComponent(String(entry.id))}`;
+      const idDeleted = await tryDelete(idQuery);
+      if (idDeleted) return true;
+
+      // Intento 2: Fallback por photo_url (si el ID es inconsistente)
+      const photoQuery = `photo_url=eq.${encodeURIComponent(entry.photo_url)}`;
+      return await tryDelete(photoQuery);
+    } catch (e) {
+      console.error('Delete evidence error:', e);
+      return false;
     }
   }
 
@@ -178,10 +238,10 @@ class DatabaseService {
     }
   }
 
-  async deleteFromCloud(table: 'diary' | 'evidences', id: string) {
+  async deleteFromCloud(table: 'diary' | 'evidences', id: string | number) {
     if (!this.config.enabled || !this.config.url) return false;
     try {
-      const response = await fetch(`${this.config.url}/rest/v1/${table}?id=eq.${id}`, {
+      const response = await fetch(`${this.config.url}/rest/v1/${table}?id=eq.${encodeURIComponent(String(id))}`, {
         method: 'DELETE',
         headers: this.getHeaders()
       });
