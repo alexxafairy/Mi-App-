@@ -126,7 +126,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-24 md:pb-10 relative overflow-hidden">
-      {/* Estrellas decorativas de fondo */}
       <Star22 className="absolute top-10 -left-10 opacity-10 rotate-12" size={200} color="var(--theme-0-main)" />
       <Star8 className="absolute bottom-20 -right-20 opacity-10 -rotate-12" size={300} color="var(--theme-2-main)" />
 

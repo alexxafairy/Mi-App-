@@ -48,8 +48,6 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
     try {
       const photoUrl = await db.uploadFile(file);
       if (photoUrl) {
-        // Usamos la fecha seleccionada por el usuario
-        // Si es hoy, usamos el tiempo actual, si es otro día, usamos el inicio de ese día
         const todayStr = new Date().toISOString().split('T')[0];
         const createdAt = selectedDate === todayStr 
           ? new Date().toISOString() 
@@ -77,7 +75,13 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
   };
 
   const confirmDelete = (entry: EvidenceEntry) => {
-    if (window.confirm("¿Eliminar este registro? No se puede deshacer.")) {
+    let shouldDelete = true;
+    try {
+      shouldDelete = window.confirm("¿Eliminar este registro? No se puede deshacer.");
+    } catch {
+      shouldDelete = true;
+    }
+    if (shouldDelete) {
       onDelete(entry);
     }
   };
@@ -232,11 +236,15 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                    <Star8 size={10} color="var(--theme-1-main)" /> {new Date(entry.created_at).toLocaleDateString()}
                 </div>
                 
-                <div className="absolute bottom-4 right-4 translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all z-20">
+                <div className="absolute bottom-4 right-4 translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all z-[60]">
                   <button 
                     type="button"
-                    onClick={() => confirmDelete(entry)}
-                    className="bg-red-500 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:bg-red-600 active:translate-y-1 active:shadow-none transition-all"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      confirmDelete(entry);
+                    }}
+                    className="bg-red-500 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:bg-red-600 active:translate-y-1 active:shadow-none transition-all cursor-pointer"
                   >
                     <Trash2 size={20} color="white" />
                   </button>

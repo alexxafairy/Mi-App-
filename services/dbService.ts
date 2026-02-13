@@ -181,12 +181,10 @@ class DatabaseService {
     };
 
     try {
-      // Intento 1: Por ID (numérico o string)
       const idQuery = `id=eq.${encodeURIComponent(String(entry.id))}`;
       const idDeleted = await tryDelete(idQuery);
       if (idDeleted) return true;
 
-      // Intento 2: Fallback por photo_url (si el ID es inconsistente)
       const photoQuery = `photo_url=eq.${encodeURIComponent(entry.photo_url)}`;
       return await tryDelete(photoQuery);
     } catch (e) {
