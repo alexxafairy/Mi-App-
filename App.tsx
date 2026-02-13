@@ -16,30 +16,30 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const initApp = async () => {
+    const cloudConfig = db.getConfig();
+    setIsCloudEnabled(cloudConfig.enabled);
+
+    let finalDiary: DiaryEntry[] = [];
+    let finalDiet: DietPlan | null = null;
+    let finalEvidences: EvidenceEntry[] = [];
+
+    if (cloudConfig.enabled && cloudConfig.url) {
+      const cloudDiary = await db.fetchFromCloud('diary');
+      const cloudDiet = await db.fetchFromCloud('diet');
+      const cloudEvidences = await db.fetchFromCloud('evidences');
+      if (cloudDiary) finalDiary = cloudDiary;
+      if (cloudDiet) finalDiet = cloudDiet;
+      if (cloudEvidences) finalEvidences = cloudEvidences;
+    }
+
+    setDiaryEntries(finalDiary);
+    setDietPlan(finalDiet);
+    setEvidenceEntries(finalEvidences);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    const initApp = async () => {
-      const cloudConfig = db.getConfig();
-      setIsCloudEnabled(cloudConfig.enabled);
-
-      let finalDiary: DiaryEntry[] = [];
-      let finalDiet: DietPlan | null = null;
-      let finalEvidences: EvidenceEntry[] = [];
-
-      if (cloudConfig.enabled && cloudConfig.url) {
-        const cloudDiary = await db.fetchFromCloud('diary');
-        const cloudDiet = await db.fetchFromCloud('diet');
-        const cloudEvidences = await db.fetchFromCloud('evidences');
-        if (cloudDiary) finalDiary = cloudDiary;
-        if (cloudDiet) finalDiet = cloudDiet;
-        if (cloudEvidences) finalEvidences = cloudEvidences;
-      }
-
-      setDiaryEntries(finalDiary);
-      setDietPlan(finalDiet);
-      setEvidenceEntries(finalEvidences);
-      setIsLoading(false);
-    };
-
     initApp();
   }, []);
 
@@ -48,6 +48,15 @@ const App: React.FC = () => {
     if (isCloudEnabled) {
       setIsSyncing(true);
       await db.syncToCloud('diary', newEntries);
+      setIsSyncing(false);
+    }
+  };
+
+  const deleteDiaryEntry = async (id: string) => {
+    setDiaryEntries(prev => prev.filter(e => e.id !== id));
+    if (isCloudEnabled) {
+      setIsSyncing(true);
+      await db.deleteFromCloud('diary', id);
       setIsSyncing(false);
     }
   };
@@ -62,12 +71,31 @@ const App: React.FC = () => {
   };
 
   const addEvidence = async (entry: EvidenceEntry) => {
-    const updated = [entry, ...evidenceEntries];
-    setEvidenceEntries(updated);
+    setEvidenceEntries(prev => [entry, ...prev]);
     if (isCloudEnabled) {
       setIsSyncing(true);
       await db.syncToCloud('evidences', entry);
       setIsSyncing(false);
+    }
+  };
+
+  const deleteEvidence = async (id: string) => {
+    // 1. Actualizamos UI inmediatamente
+    setEvidenceEntries(prev => {
+      const filtered = prev.filter(e => e.id !== id);
+      return [...filtered]; // Creamos nueva referencia de array
+    });
+
+    // 2. Borramos en segundo plano
+    if (isCloudEnabled) {
+      setIsSyncing(true);
+      try {
+        await db.deleteFromCloud('evidences', id);
+      } catch (e) {
+        console.error("Error al borrar en nube:", e);
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
@@ -121,9 +149,16 @@ const App: React.FC = () => {
         </div>
 
         <div className="animate-in">
-          {activeTab === AppTab.DIARY && <DiarySection entries={diaryEntries} onUpdate={saveDiary} />}
+          {activeTab === AppTab.DIARY && <DiarySection entries={diaryEntries} onUpdate={saveDiary} onDelete={deleteDiaryEntry} />}
           {activeTab === AppTab.DIET && <DietSection plan={dietPlan} onUpdate={saveDiet} />}
-          {activeTab === AppTab.EVIDENCES && <EvidenceSection entries={evidenceEntries} onAdd={addEvidence} />}
+          {activeTab === AppTab.EVIDENCES && (
+            <EvidenceSection 
+              entries={evidenceEntries} 
+              onAdd={addEvidence} 
+              onDelete={deleteEvidence} 
+              onRefresh={initApp} 
+            />
+          )}
           {activeTab === AppTab.SUMMARY && (
             <SummarySection 
               diaryEntries={diaryEntries} 

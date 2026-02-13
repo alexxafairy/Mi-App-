@@ -7,10 +7,6 @@ export interface CloudConfig {
   enabled: boolean;
 }
 
-/**
- * DIRECTOR: He actualizado estos valores con lo que veo en tu captura.
- * Si tu URL de proyecto termina siendo distinta, cámbiala aquí.
- */
 const MASTER_URL = 'https://htlipdwjdwixibfigomk.supabase.co'; 
 const MASTER_KEY = 'sb_publishable_JkXmZ0mpGXUG6Eh1jNlqgA_8B299_vl'; 
 
@@ -30,7 +26,6 @@ class DatabaseService {
     }
   }
 
-  // Método para probar la conexión manualmente
   async testConnection() {
     try {
       const res = await fetch(`${this.config.url}/rest/v1/diary?select=count`, {
@@ -38,7 +33,7 @@ class DatabaseService {
       });
       if (res.ok) return { success: true, message: "¡Conexión Exitosa con la DB!" };
       const err = await res.json();
-      return { success: false, message: err.message || "Error de permisos (401/403)" };
+      return { success: false, message: err.message || `Error ${res.status}` };
     } catch (e) {
       return { success: false, message: "Error de red: Verifica la URL" };
     }
@@ -85,9 +80,13 @@ class DatabaseService {
         body: file
       });
 
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.error("Storage Error:", await response.text());
+        return null;
+      }
       return `${this.config.url}/storage/v1/object/public/evidences/${fileName}`;
     } catch (e) {
+      console.error("Upload exception:", e);
       return null;
     }
   }
@@ -99,7 +98,10 @@ class DatabaseService {
         headers: this.getHeaders()
       });
       
-      if (!response.ok) return table === 'diet' ? null : [];
+      if (!response.ok) {
+        console.error(`Fetch error from ${table}:`, await response.text());
+        return table === 'diet' ? null : [];
+      }
       
       const data = await response.json();
       
@@ -122,12 +124,13 @@ class DatabaseService {
           emociones: d.emociones,
           pensamientosAutomaticos: d.pensamientos_automaticos,
           insight: d.insight,
-          createdAt: d.created_at ? new Date(d.created_at).getTime() : Date.now()
+          createdAt: d.created_at_val || Date.now()
         })).sort((a: any, b: any) => b.createdAt - a.createdAt);
       }
       
       return data;
     } catch (e) {
+      console.error(`Exception fetching ${table}:`, e);
       return table === 'diet' ? null : [];
     }
   }
@@ -143,18 +146,18 @@ class DatabaseService {
       };
 
       if (type === 'diet') {
-        body = { id: 1, plan: data }; // Siempre usamos ID 1 para la dieta actual
+        body = { id: 1, plan: data };
       } else if (type === 'evidences') {
-        body = data; // Es un objeto individual
+        body = data; 
       } else if (type === 'diary') {
-        // El diario sincroniza toda la lista
         body = data.map((d: any) => ({
           id: d.id,
           fecha: d.fecha,
           situacion: d.situacion,
           emociones: d.emociones,
           pensamientos_automaticos: d.pensamientosAutomaticos,
-          insight: d.insight
+          insight: d.insight,
+          created_at_val: d.createdAt
         }));
       }
 
@@ -164,8 +167,27 @@ class DatabaseService {
         body: JSON.stringify(body)
       });
 
+      if (!response.ok) {
+        console.error(`Sync error on ${type}:`, await response.text());
+      }
+
       return response.ok;
     } catch (e) {
+      console.error(`Sync exception on ${type}:`, e);
+      return false;
+    }
+  }
+
+  async deleteFromCloud(table: 'diary' | 'evidences', id: string) {
+    if (!this.config.enabled || !this.config.url) return false;
+    try {
+      const response = await fetch(`${this.config.url}/rest/v1/${table}?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      return response.ok;
+    } catch (e) {
+      console.error(`Delete error on ${table}:`, e);
       return false;
     }
   }

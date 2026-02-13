@@ -1,11 +1,13 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { EvidenceEntry } from '../types';
 import { db } from '../services/dbService';
 
 interface Props {
   entries: EvidenceEntry[];
   onAdd: (entry: EvidenceEntry) => void;
+  onDelete: (id: string) => void;
+  onRefresh: () => void;
 }
 
 const TASKS = [
@@ -16,25 +18,16 @@ const TASKS = [
   "Otra tarea psicológica"
 ];
 
-const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
+const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedTask, setSelectedTask] = useState(TASKS[0]);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [localEntries, setLocalEntries] = useState<EvidenceEntry[]>(entries);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Sincronizar estado local cuando cambian las props
-  useEffect(() => {
-    setLocalEntries(entries);
-  }, [entries]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    const cloudData = await db.fetchFromCloud('evidences');
-    if (cloudData) {
-      setLocalEntries(cloudData);
-    }
+    await onRefresh();
     setIsRefreshing(false);
   };
 
@@ -47,24 +40,28 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
       const photoUrl = await db.uploadFile(file);
       if (photoUrl) {
         const newEntry: EvidenceEntry = {
-          id: Math.random().toString(36).substr(2, 9),
+          id: crypto.randomUUID(),
           task_name: selectedTask,
           photo_url: photoUrl,
           created_at: new Date().toISOString()
         };
-        // Guardar en la nube primero
-        await db.syncToCloud('evidences', newEntry);
-        // Actualizar UI
         onAdd(newEntry);
         setIsAdding(false);
       } else {
-        alert("Error al subir la imagen. Verifica que el bucket 'evidences' sea público.");
+        alert("Error al subir la imagen. Verifica el bucket 'evidences'.");
       }
     } catch (err) {
       console.error(err);
       alert("Error de conexión al subir.");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const confirmDelete = (id: string) => {
+    // Usamos window.confirm para pausar la ejecución y asegurar captura
+    if (window.confirm("¿Eliminar esta toma de la película? No se puede deshacer.")) {
+      onDelete(id);
     }
   };
 
@@ -81,12 +78,12 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
             onClick={handleRefresh}
             className={`ml-4 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-black transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
           >
-            {isRefreshing ? '⌛ Cargando...' : '🔄 Sincronizar'}
+            {isRefreshing ? '⌛' : '🔄'} Sincronizar
           </button>
         </div>
         <button 
           onClick={() => setIsAdding(!isAdding)} 
-          className="clay-button bg-amber-400 px-6 py-2 shadow-[4px_4px_0px_0px_#000]"
+          className="clay-button bg-amber-400 px-6 py-2 shadow-[4px_4px_0px_0px_#000] text-xs"
         >
           {isAdding ? 'CANCELAR' : '+ REGISTRAR'}
         </button>
@@ -100,8 +97,9 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
               {TASKS.map(task => (
                 <button 
                   key={task}
+                  type="button"
                   onClick={() => setSelectedTask(task)}
-                  className={`px-4 py-3 rounded-[5px] border-2 font-bold text-xs transition-all text-left ${
+                  className={`px-4 py-3 rounded-[5px] border-2 font-bold text-[10px] transition-all text-left uppercase ${
                     selectedTask === task 
                     ? 'bg-black text-white border-black scale-[1.02]' 
                     : 'bg-white border-slate-200 hover:border-black'
@@ -115,7 +113,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
           </div>
 
           <div className="pt-4 border-t-2 border-dashed border-amber-200">
-            <label className="block text-xs font-black uppercase tracking-widest opacity-60 mb-4">Sube tu evidencia (Foto):</label>
+            <label className="block text-xs font-black uppercase tracking-widest opacity-60 mb-4">Evidencia Visual:</label>
             <input 
               type="file" 
               accept="image/*" 
@@ -124,13 +122,14 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
               onChange={handleFileUpload}
             />
             <button 
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
               className={`w-full py-10 border-4 border-dashed border-slate-300 rounded-[10px] flex flex-col items-center justify-center transition-all hover:border-amber-400 hover:bg-white active:scale-[0.98] ${isUploading ? 'opacity-50 cursor-wait' : ''}`}
             >
               <span className="text-4xl mb-2">{isUploading ? '⏳' : '📸'}</span>
-              <span className="font-black uppercase text-xs tracking-widest">
-                {isUploading ? 'Subiendo a la nube...' : 'Toca para elegir foto'}
+              <span className="font-black uppercase text-xs tracking-widest text-center">
+                {isUploading ? 'Guardando en la nube...' : 'Toca para capturar escena'}
               </span>
             </button>
           </div>
@@ -138,7 +137,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {localEntries.map(entry => (
+        {entries.map(entry => (
           <div key={entry.id} className="clay-card p-4 pb-6 transform rotate-1 hover:rotate-0 transition-transform bg-white relative">
             <div className="aspect-square w-full mb-4 bg-slate-100 rounded-[3px] overflow-hidden border-2 border-black relative group">
               <img 
@@ -149,16 +148,27 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
                   (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Error+de+Carga';
                 }}
               />
-              <div className="absolute top-2 right-2 bg-black text-white text-[9px] font-black px-2 py-1 uppercase rounded">
+              <div className="absolute top-2 right-2 bg-black text-white text-[9px] font-black px-2 py-1 uppercase rounded z-10">
                 {new Date(entry.created_at).toLocaleDateString()}
               </div>
               
-              <button 
-                onClick={() => handleGenerateAnim(entry.task_name)}
-                className="absolute bottom-3 right-3 bg-amber-400 border-2 border-black p-2 rounded-full shadow-[2px_2px_0px_0px_#000] hover:translate-y-[-2px] transition-all opacity-0 group-hover:opacity-100"
-              >
-                🎬
-              </button>
+              {/* Contenedor de botones con z-index alto para evitar solapamientos */}
+              <div className="absolute bottom-3 right-3 flex space-x-2 z-20 md:opacity-0 md:group-hover:opacity-100 transition-all">
+                <button 
+                  type="button"
+                  onClick={() => confirmDelete(entry.id)}
+                  className="bg-red-500 border-2 border-black p-3 rounded-full shadow-[2px_2px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all flex items-center justify-center"
+                >
+                  <span className="text-lg">🗑️</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => handleGenerateAnim(entry.task_name)}
+                  className="bg-amber-400 border-2 border-black p-3 rounded-full shadow-[2px_2px_0px_0px_#000] hover:translate-y-[-2px] active:translate-y-0 active:shadow-none transition-all flex items-center justify-center"
+                >
+                  <span className="text-lg">🎬</span>
+                </button>
+              </div>
             </div>
             <div className="space-y-1 text-center">
                <h4 className="font-black uppercase italic tracking-tighter text-lg leading-tight">{entry.task_name}</h4>
@@ -166,12 +176,6 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd }) => {
             </div>
           </div>
         ))}
-        {localEntries.length === 0 && !isAdding && (
-          <div className="col-span-full py-20 text-center clay-card bg-slate-50 border-dashed opacity-40">
-            <p className="font-black uppercase italic tracking-widest">Aún no hay clips en tu galería</p>
-            <button onClick={handleRefresh} className="text-[10px] uppercase font-bold mt-2 underline">Intentar sincronizar ahora</button>
-          </div>
-        )}
       </div>
     </div>
   );
