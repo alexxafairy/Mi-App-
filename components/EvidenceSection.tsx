@@ -77,7 +77,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
   const confirmDelete = (entry: EvidenceEntry) => {
     let shouldDelete = false;
     try {
-      shouldDelete = window.confirm("¿Eliminar esta escena de tu película? No se puede deshacer.");
+      shouldDelete = window.confirm("¿Eliminar esta toma de la película? No se puede deshacer.");
     } catch {
       shouldDelete = true;
     }
@@ -99,7 +99,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
               onClick={handleRefresh}
               className={`text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-black transition-colors flex items-center gap-1 ${isRefreshing ? 'opacity-50' : ''}`}
             >
-              {isRefreshing ? '⌛ Cargando...' : '🔄 Sincronizar Galería'}
+              {isRefreshing ? '⌛' : '🔄'} Sincronizar Galería
             </button>
           </div>
         </div>
@@ -107,7 +107,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
           onClick={() => setIsAdding(!isAdding)} 
           className={`clay-button ${isAdding ? 'bg-red-400' : 'bg-amber-400'} px-8 py-3 shadow-[5px_5px_0px_0px_#000] text-sm flex items-center gap-2`}
         >
-          {isAdding ? 'CANCELAR' : <><Plus size={18} strokeWidth={3} /> REGISTRAR ESCENA</>}
+          {isAdding ? 'CANCELAR' : <><Plus size={18} strokeWidth={3} /> REGISTRAR LOGRO</>}
         </button>
       </div>
 
@@ -141,7 +141,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                 {isDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-white border-4 border-black rounded-[10px] shadow-[8px_8px_0px_0px_#000] z-[100] overflow-hidden animate-in">
                     <div className="p-2 bg-slate-50 border-b-2 border-black">
-                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 px-2">Actividades Sugeridas</p>
+                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 px-2">Sugerencias</p>
                     </div>
                     {TASKS.map((task) => (
                       <button
@@ -228,7 +228,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                   alt={entry.task_name} 
                   className="w-full h-full object-cover transition-all duration-700"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Registro+no+encontrado';
+                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Error+al+cargar';
                   }}
                 />
                 
@@ -236,7 +236,6 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                    <Star8 size={10} color="var(--theme-1-main)" /> {new Date(entry.created_at).toLocaleDateString()}
                 </div>
                 
-                {/* Botón de Borrado mejorado para móviles */}
                 <div className="absolute bottom-4 right-4 z-[60]">
                   <button 
                     type="button"

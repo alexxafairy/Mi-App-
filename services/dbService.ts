@@ -173,8 +173,6 @@ class DatabaseService {
     if (!this.config.enabled || !this.config.url) return true;
 
     const tryDelete = async (query: string) => {
-      // Usamos return=representation para que Supabase nos devuelva lo que borró.
-      // Si la lista de borrados está vacía, es que no existía o RLS lo bloqueó.
       const response = await fetch(`${this.config.url}/rest/v1/evidences?${query}`, {
         method: 'DELETE',
         headers: {
@@ -182,20 +180,24 @@ class DatabaseService {
           'Prefer': 'return=representation'
         }
       });
-      
-      if (!response.ok) return false;
-      
-      const deletedData = await response.json();
-      return Array.isArray(deletedData) && deletedData.length > 0;
+
+      if (!response.ok) {
+        console.error('Delete evidence request failed:', await response.text());
+        return false;
+      }
+
+      // Si el status es OK (incluyendo 204 No Content), consideramos éxito.
+      // Incluso si regresa [], confiamos en el status del servidor para evitar falsos negativos.
+      return true;
     };
 
     try {
-      // Intentamos por ID primero
+      // Intentamos por ID
       const idQuery = `id=eq.${encodeURIComponent(String(entry.id))}`;
       const idDeleted = await tryDelete(idQuery);
       if (idDeleted) return true;
 
-      // Si falló por ID (ej: uuid local vs serial db), intentamos por URL de foto
+      // Respaldo por URL de foto si el ID local no coincide con el de la DB
       const photoQuery = `photo_url=eq.${encodeURIComponent(entry.photo_url)}`;
       return await tryDelete(photoQuery);
     } catch (e) {

@@ -91,28 +91,30 @@ const App: React.FC = () => {
   };
 
   const deleteEvidence = async (entry: EvidenceEntry) => {
-    // 1. Actualizamos UI inmediatamente (Borrado Optimista)
+    // 1. Borrado Optimista (Actualizamos UI de inmediato)
     setEvidenceEntries(prev => prev.filter(e => String(e.id) !== String(entry.id)));
 
-    // 2. Intentamos borrar en la nube
+    // 2. Intentamos persistir en la nube
     if (isCloudEnabled) {
       setIsSyncing(true);
       try {
-        const deleted = await db.deleteEvidence(entry);
-        if (!deleted) {
-          // Rollback si el backend no eliminó nada (ej: políticas RLS o error silencioso)
+        const success = await db.deleteEvidence(entry);
+        if (!success) {
+          // Si el servidor dio error real, restauramos la UI
           setEvidenceEntries(prev => {
-            const exists = prev.some(e => String(e.id) === String(entry.id));
-            return exists ? prev : [entry, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+             const exists = prev.some(e => String(e.id) === String(entry.id));
+             if (exists) return prev;
+             return [entry, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
           });
           alert('No se pudo borrar permanentemente de la nube. Por favor, intenta de nuevo o sincroniza tu estudio.');
         }
       } catch (e) {
         console.error("Error al borrar en nube:", e);
-        // Rollback por excepción de red
+        // Rollback por error de conexión
         setEvidenceEntries(prev => {
           const exists = prev.some(e => String(e.id) === String(entry.id));
-          return exists ? prev : [entry, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          if (exists) return prev;
+          return [entry, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         });
       } finally {
         setIsSyncing(false);
@@ -132,8 +134,8 @@ const App: React.FC = () => {
             <Star8 className="absolute -bottom-6 -right-6 animate-pulse" size={60} color="var(--theme-1-main)" />
           </div>
           <div className="space-y-1">
-            <p className="font-black uppercase tracking-[0.2em] text-sm text-black">Preparando tu diario, Mariana</p>
-            <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Acompañamiento Personal</p>
+            <p className="font-black uppercase tracking-[0.2em] text-sm text-black">Cargando Estudio</p>
+            <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">ClayMinds Studio System</p>
           </div>
         </div>
       </div>
