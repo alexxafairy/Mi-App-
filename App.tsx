@@ -74,25 +74,35 @@ const App: React.FC = () => {
     setEvidenceEntries(prev => [entry, ...prev]);
     if (isCloudEnabled) {
       setIsSyncing(true);
-      await db.syncToCloud('evidences', entry);
+      const savedEntry = await db.createEvidence(entry);
+      if (savedEntry) {
+        setEvidenceEntries(prev => prev.map(e => (e.id === entry.id ? savedEntry : e)));
+      }
       setIsSyncing(false);
     }
   };
 
-  const deleteEvidence = async (id: string) => {
+  const deleteEvidence = async (entry: EvidenceEntry) => {
     // 1. Actualizamos UI inmediatamente
-    setEvidenceEntries(prev => {
-      const filtered = prev.filter(e => e.id !== id);
-      return [...filtered]; // Creamos nueva referencia de array
-    });
+    setEvidenceEntries(prev => prev.filter(e => String(e.id) !== String(entry.id)));
 
     // 2. Borramos en segundo plano
     if (isCloudEnabled) {
       setIsSyncing(true);
       try {
-        await db.deleteFromCloud('evidences', id);
+        const deleted = await db.deleteEvidence(entry);
+        if (!deleted) {
+          // Si backend no borró nada, restauramos para evitar "borrado fantasma".
+          setEvidenceEntries(prev => (prev.some(e => String(e.id) === String(entry.id)) ? prev : [entry, ...prev]));
+          alert('No se pudo borrar permanentemente de la nube. Por favor, intenta de nuevo o sincroniza tu estudio.');
+        } else {
+          // Confirmamos estado real desde nube para evitar que reaparezca al refrescar.
+          const cloudEvidences = await db.fetchFromCloud('evidences');
+          if (cloudEvidences) setEvidenceEntries(cloudEvidences);
+        }
       } catch (e) {
         console.error("Error al borrar en nube:", e);
+        setEvidenceEntries(prev => (prev.some(e => String(e.id) === String(entry.id)) ? prev : [entry, ...prev]));
       } finally {
         setIsSyncing(false);
       }

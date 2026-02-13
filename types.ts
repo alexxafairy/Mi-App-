@@ -25,7 +25,7 @@ export interface DietPlan {
 }
 
 export interface EvidenceEntry {
-  id: string;
+  id: string | number;
   task_name: string;
   photo_url: string;
   created_at: string;
