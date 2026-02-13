@@ -75,9 +75,9 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
   };
 
   const confirmDelete = (entry: EvidenceEntry) => {
-    let shouldDelete = true;
+    let shouldDelete = false;
     try {
-      shouldDelete = window.confirm("¿Eliminar este registro? No se puede deshacer.");
+      shouldDelete = window.confirm("¿Eliminar esta escena de tu película? No se puede deshacer.");
     } catch {
       shouldDelete = true;
     }
@@ -99,7 +99,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
               onClick={handleRefresh}
               className={`text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-black transition-colors flex items-center gap-1 ${isRefreshing ? 'opacity-50' : ''}`}
             >
-              {isRefreshing ? '⌛ Cargando...' : '🔄 Actualizar Logros'}
+              {isRefreshing ? '⌛ Cargando...' : '🔄 Sincronizar Galería'}
             </button>
           </div>
         </div>
@@ -107,7 +107,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
           onClick={() => setIsAdding(!isAdding)} 
           className={`clay-button ${isAdding ? 'bg-red-400' : 'bg-amber-400'} px-8 py-3 shadow-[5px_5px_0px_0px_#000] text-sm flex items-center gap-2`}
         >
-          {isAdding ? 'CANCELAR' : <><Plus size={18} strokeWidth={3} /> REGISTRAR LOGRO</>}
+          {isAdding ? 'CANCELAR' : <><Plus size={18} strokeWidth={3} /> REGISTRAR ESCENA</>}
         </button>
       </div>
 
@@ -200,7 +200,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                 {isUploading ? <span className="text-3xl animate-spin">⏳</span> : <ImageIcon size={32} strokeWidth={2.5} />}
               </div>
               <p className="font-black uppercase text-sm tracking-widest text-black">
-                {isUploading ? 'Guardando registro...' : 'Toca para subir foto'}
+                {isUploading ? 'Guardando en la nube...' : 'Toca para capturar escena'}
               </p>
             </button>
           </div>
@@ -236,7 +236,8 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                    <Star8 size={10} color="var(--theme-1-main)" /> {new Date(entry.created_at).toLocaleDateString()}
                 </div>
                 
-                <div className="absolute bottom-4 right-4 translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all z-[60]">
+                {/* Botón de Borrado mejorado para móviles */}
+                <div className="absolute bottom-4 right-4 z-[60]">
                   <button 
                     type="button"
                     onClick={(e) => {
@@ -244,7 +245,7 @@ const EvidenceSection: React.FC<Props> = ({ entries, onAdd, onDelete, onRefresh 
                       e.stopPropagation();
                       confirmDelete(entry);
                     }}
-                    className="bg-red-500 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:bg-red-600 active:translate-y-1 active:shadow-none transition-all cursor-pointer"
+                    className="bg-red-500 border-[3px] border-black p-3 rounded-[8px] shadow-[3px_3px_0px_0px_#000] hover:bg-red-600 active:translate-y-1 active:shadow-none transition-all cursor-pointer touch-manipulation"
                   >
                     <Trash2 size={20} color="white" />
                   </button>

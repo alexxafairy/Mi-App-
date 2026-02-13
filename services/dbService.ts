@@ -169,22 +169,33 @@ class DatabaseService {
     }
   }
 
-  async deleteEvidence(entry: EvidenceEntry) {
+  async deleteEvidence(entry: EvidenceEntry): Promise<boolean> {
     if (!this.config.enabled || !this.config.url) return true;
 
     const tryDelete = async (query: string) => {
+      // Usamos return=representation para que Supabase nos devuelva lo que borró.
+      // Si la lista de borrados está vacía, es que no existía o RLS lo bloqueó.
       const response = await fetch(`${this.config.url}/rest/v1/evidences?${query}`, {
         method: 'DELETE',
-        headers: this.getHeaders()
+        headers: {
+          ...this.getHeaders(),
+          'Prefer': 'return=representation'
+        }
       });
-      return response.ok;
+      
+      if (!response.ok) return false;
+      
+      const deletedData = await response.json();
+      return Array.isArray(deletedData) && deletedData.length > 0;
     };
 
     try {
+      // Intentamos por ID primero
       const idQuery = `id=eq.${encodeURIComponent(String(entry.id))}`;
       const idDeleted = await tryDelete(idQuery);
       if (idDeleted) return true;
 
+      // Si falló por ID (ej: uuid local vs serial db), intentamos por URL de foto
       const photoQuery = `photo_url=eq.${encodeURIComponent(entry.photo_url)}`;
       return await tryDelete(photoQuery);
     } catch (e) {

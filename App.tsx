@@ -91,13 +91,29 @@ const App: React.FC = () => {
   };
 
   const deleteEvidence = async (entry: EvidenceEntry) => {
+    // 1. Actualizamos UI inmediatamente (Borrado Optimista)
     setEvidenceEntries(prev => prev.filter(e => String(e.id) !== String(entry.id)));
+
+    // 2. Intentamos borrar en la nube
     if (isCloudEnabled) {
       setIsSyncing(true);
       try {
-        await db.deleteEvidence(entry);
+        const deleted = await db.deleteEvidence(entry);
+        if (!deleted) {
+          // Rollback si el backend no eliminó nada (ej: políticas RLS o error silencioso)
+          setEvidenceEntries(prev => {
+            const exists = prev.some(e => String(e.id) === String(entry.id));
+            return exists ? prev : [entry, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          });
+          alert('No se pudo borrar permanentemente de la nube. Por favor, intenta de nuevo o sincroniza tu estudio.');
+        }
       } catch (e) {
         console.error("Error al borrar en nube:", e);
+        // Rollback por excepción de red
+        setEvidenceEntries(prev => {
+          const exists = prev.some(e => String(e.id) === String(entry.id));
+          return exists ? prev : [entry, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        });
       } finally {
         setIsSyncing(false);
       }
@@ -145,7 +161,7 @@ const App: React.FC = () => {
           </div>
           <div className={`flex items-center space-x-2 bg-white border-2 border-black px-4 py-2 rounded-[5px] shadow-[3px_3px_0px_0px_#000] transition-all ${isSyncing ? 'animate-pulse' : ''}`}>
              <span className={`w-2.5 h-2.5 rounded-full ${isCloudEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-             <span className="text-[10px] font-black uppercase tracking-widest">{isSyncing ? 'Guardando...' : 'Conectado'}</span>
+             <span className="text-[10px] font-black uppercase tracking-widest">{isSyncing ? 'Sincronizando...' : 'Conectado'}</span>
           </div>
         </div>
       </header>
