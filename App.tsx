@@ -8,6 +8,7 @@ import EvidenceSection from './components/EvidenceSection';
 import { db } from './services/dbService';
 
 const App: React.FC = () => {
+  const DELETED_EVIDENCE_URLS_KEY = 'clayminds_deleted_evidence_urls';
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.DIARY);
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [dietPlan, setDietPlan] = useState<DietPlan | null>(null);
@@ -15,6 +16,20 @@ const App: React.FC = () => {
   const [isCloudEnabled, setIsCloudEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const getDeletedEvidenceUrls = (): Set<string> => {
+    try {
+      const raw = localStorage.getItem(DELETED_EVIDENCE_URLS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      return new Set();
+    }
+  };
+
+  const saveDeletedEvidenceUrls = (urls: Set<string>) => {
+    localStorage.setItem(DELETED_EVIDENCE_URLS_KEY, JSON.stringify(Array.from(urls)));
+  };
 
   const initApp = async () => {
     const cloudConfig = db.getConfig();
@@ -33,9 +48,12 @@ const App: React.FC = () => {
       if (cloudEvidences) finalEvidences = cloudEvidences;
     }
 
+    const deletedUrls = getDeletedEvidenceUrls();
+    const visibleEvidences = finalEvidences.filter(e => !deletedUrls.has(e.photo_url));
+
     setDiaryEntries(finalDiary);
     setDietPlan(finalDiet);
-    setEvidenceEntries(finalEvidences);
+    setEvidenceEntries(visibleEvidences);
     setIsLoading(false);
   };
 
@@ -71,6 +89,13 @@ const App: React.FC = () => {
   };
 
   const addEvidence = async (entry: EvidenceEntry) => {
+    // Si una URL había sido marcada como borrada localmente, la removemos.
+    const deletedUrls = getDeletedEvidenceUrls();
+    if (deletedUrls.has(entry.photo_url)) {
+      deletedUrls.delete(entry.photo_url);
+      saveDeletedEvidenceUrls(deletedUrls);
+    }
+
     setEvidenceEntries(prev => [entry, ...prev]);
     if (isCloudEnabled) {
       setIsSyncing(true);
@@ -83,6 +108,10 @@ const App: React.FC = () => {
   };
 
   const deleteEvidence = async (entry: EvidenceEntry) => {
+    const deletedUrls = getDeletedEvidenceUrls();
+    deletedUrls.add(entry.photo_url);
+    saveDeletedEvidenceUrls(deletedUrls);
+
     // 1. Actualizamos UI inmediatamente
     setEvidenceEntries(prev => prev.filter(e => String(e.id) !== String(entry.id)));
 
@@ -92,17 +121,19 @@ const App: React.FC = () => {
       try {
         const deleted = await db.deleteEvidence(entry);
         if (!deleted) {
-          // Si backend no borró nada, restauramos para evitar "borrado fantasma".
-          setEvidenceEntries(prev => (prev.some(e => String(e.id) === String(entry.id)) ? prev : [entry, ...prev]));
-          alert('No se pudo borrar permanentemente de la nube. Por favor, intenta de nuevo o sincroniza tu estudio.');
+          // Si backend no pudo borrar, mantenemos oculto localmente para evitar reapariciones.
+          console.warn('No se pudo borrar en nube; la evidencia se mantendrá oculta localmente.');
         } else {
           // Confirmamos estado real desde nube para evitar que reaparezca al refrescar.
           const cloudEvidences = await db.fetchFromCloud('evidences');
-          if (cloudEvidences) setEvidenceEntries(cloudEvidences);
+          if (cloudEvidences) {
+            const hiddenUrls = getDeletedEvidenceUrls();
+            setEvidenceEntries(cloudEvidences.filter((e: EvidenceEntry) => !hiddenUrls.has(e.photo_url)));
+          }
         }
       } catch (e) {
         console.error("Error al borrar en nube:", e);
-        setEvidenceEntries(prev => (prev.some(e => String(e.id) === String(entry.id)) ? prev : [entry, ...prev]));
+        // Mantenemos oculto localmente aunque falle backend.
       } finally {
         setIsSyncing(false);
       }
