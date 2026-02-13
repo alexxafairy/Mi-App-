@@ -98,7 +98,7 @@ const parseDietStructuredText = (text: string): DietPlan | null => {
 };
 
 export const parseDietFromText = async (text: string): Promise<DietPlan> => {
-  // Intentar primero parseo manual si el formato es muy estándar
+  // Intentar primero parseo manual si el formato es muy estándar (SEMANA/DÍA)
   const parsedManual = parseDietStructuredText(text);
   if (parsedManual && parsedManual.schedule.length > 5) return parsedManual;
 

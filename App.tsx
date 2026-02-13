@@ -82,15 +82,17 @@ const App: React.FC = () => {
       const cloudDiet = await db.fetchFromCloud('diet');
       const cloudEvidences = await db.fetchFromCloud('evidences');
       
-      // Protección: Solo sobrescribir cache si la nube tiene datos o si el cache está vacío
+      // Protector: Solo sobrescribir cache si la nube trae datos reales o si el local está vacío.
       if (Array.isArray(cloudDiary) && (cloudDiary.length > 0 || finalDiary.length === 0)) {
         finalDiary = cloudDiary;
         writeDiaryCache(cloudDiary);
       }
+      
       if (cloudDiet !== null) {
         finalDiet = cloudDiet;
         writeDietCache(cloudDiet);
       }
+      
       if (cloudEvidences) finalEvidences = cloudEvidences;
     }
 
@@ -141,6 +143,7 @@ const App: React.FC = () => {
   };
 
   const addEvidence = async (entry: EvidenceEntry) => {
+    // Si una URL había sido marcada como borrada localmente, la removemos.
     const deletedUrls = getDeletedEvidenceUrls();
     if (deletedUrls.has(entry.photo_url)) {
       deletedUrls.delete(entry.photo_url);
@@ -168,15 +171,19 @@ const App: React.FC = () => {
     deletedUrls.add(entry.photo_url);
     saveDeletedEvidenceUrls(deletedUrls);
 
+    // 1. Actualizamos UI inmediatamente
     setEvidenceEntries(prev => prev.filter(e => String(e.id) !== String(entry.id)));
 
+    // 2. Borramos en segundo plano
     if (isCloudEnabled) {
       setIsSyncing(true);
       try {
         const deleted = await db.deleteEvidence(entry);
         if (!deleted) {
+          // Si backend no pudo borrar, mantenemos oculto localmente para evitar reapariciones.
           console.warn('No se pudo borrar en nube; la evidencia se mantendrá oculta localmente.');
         } else {
+          // Confirmamos estado real desde nube para evitar que reaparezca al refrescar.
           const cloudEvidences = await db.fetchFromCloud('evidences');
           if (cloudEvidences) {
             const hiddenUrls = getDeletedEvidenceUrls();
