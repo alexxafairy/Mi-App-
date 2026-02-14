@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppTab, DiaryEntry, DietPlan, EvidenceEntry } from './types';
 import DiarySection from './components/DiarySection';
@@ -79,13 +78,18 @@ const App: React.FC = () => {
 
     if (cloudConfig.enabled && cloudConfig.url) {
       const cloudDiary = await db.fetchFromCloud('diary');
+      const cloudDiaryBackup = await db.fetchDiaryBackupFromStorage();
       const cloudDiet = await db.fetchFromCloud('diet');
       const cloudEvidences = await db.fetchFromCloud('evidences');
+
+      const hasPrimaryDiary = Array.isArray(cloudDiary) && cloudDiary.length > 0;
+      const hasBackupDiary = Array.isArray(cloudDiaryBackup) && cloudDiaryBackup.length > 0;
+      const chosenDiary = hasPrimaryDiary ? cloudDiary : (hasBackupDiary ? cloudDiaryBackup : cloudDiary);
       
       // Protector: Solo sobrescribir cache si la nube trae datos reales o si el local está vacío.
-      if (Array.isArray(cloudDiary) && (cloudDiary.length > 0 || finalDiary.length === 0)) {
-        finalDiary = cloudDiary;
-        writeDiaryCache(cloudDiary);
+      if (Array.isArray(chosenDiary) && (chosenDiary.length > 0 || finalDiary.length === 0)) {
+        finalDiary = chosenDiary;
+        writeDiaryCache(chosenDiary);
       }
       
       if (cloudDiet !== null) {
@@ -114,21 +118,30 @@ const App: React.FC = () => {
     writeDiaryCache(newEntries);
     if (isCloudEnabled) {
       setIsSyncing(true);
-      await db.syncToCloud('diary', newEntries);
-      setIsSyncing(false);
+      try {
+        await db.syncToCloud('diary', newEntries);
+        await db.syncDiaryBackupToStorage(newEntries);
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
   const deleteDiaryEntry = async (id: string) => {
+    let updatedEntries: DiaryEntry[] = [];
     setDiaryEntries(prev => {
-      const updated = prev.filter(e => e.id !== id);
-      writeDiaryCache(updated);
-      return updated;
+      updatedEntries = prev.filter(e => e.id !== id);
+      writeDiaryCache(updatedEntries);
+      return updatedEntries;
     });
     if (isCloudEnabled) {
       setIsSyncing(true);
-      await db.deleteFromCloud('diary', id);
-      setIsSyncing(false);
+      try {
+        await db.deleteFromCloud('diary', id);
+        await db.syncDiaryBackupToStorage(updatedEntries);
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 

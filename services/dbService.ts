@@ -8,6 +8,7 @@ export interface CloudConfig {
 
 const MASTER_URL = 'https://htlipdwjdwixibfigomk.supabase.co'; 
 const MASTER_KEY = 'sb_publishable_JkXmZ0mpGXUG6Eh1jNlqgA_8B299_vl'; 
+const DIARY_BACKUP_STORAGE_PATH = 'diary-sync/shared-diary.json';
 
 class DatabaseService {
   private config: CloudConfig;
@@ -131,6 +132,55 @@ class DatabaseService {
     } catch (e) {
       console.error(`Exception fetching ${table}:`, e);
       return table === 'diet' ? null : [];
+    }
+  }
+
+  async fetchDiaryBackupFromStorage(): Promise<DiaryEntry[] | null> {
+    if (!this.config.enabled || !this.config.url) return null;
+    try {
+      const publicUrl = `${this.config.url}/storage/v1/object/public/evidences/${DIARY_BACKUP_STORAGE_PATH}`;
+      const response = await fetch(publicUrl, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const raw = await response.json();
+      if (!Array.isArray(raw)) return null;
+
+      return raw.map((d: any) => ({
+        id: String(d.id ?? crypto.randomUUID()),
+        fecha: d.fecha,
+        situacion: d.situacion,
+        emociones: d.emociones,
+        pensamientosAutomaticos: d.pensamientosAutomaticos ?? d.pensamientos_automaticos ?? '',
+        insight: d.insight,
+        createdAt: Number(d.createdAt ?? d.created_at_val ?? d.created_at ?? Date.now())
+      })).sort((a: DiaryEntry, b: DiaryEntry) => b.createdAt - a.createdAt);
+    } catch (e) {
+      console.error('Fetch diary backup exception:', e);
+      return null;
+    }
+  }
+
+  async syncDiaryBackupToStorage(entries: DiaryEntry[]): Promise<boolean> {
+    if (!this.config.enabled || !this.config.url) return false;
+    try {
+      const response = await fetch(`${this.config.url}/storage/v1/object/evidences/${DIARY_BACKUP_STORAGE_PATH}`, {
+        method: 'POST',
+        headers: {
+          'apikey': this.config.key,
+          'Authorization': `Bearer ${this.config.key}`,
+          'Content-Type': 'application/json',
+          'x-upsert': 'true'
+        },
+        body: JSON.stringify(entries)
+      });
+
+      if (!response.ok) {
+        console.error('Sync diary backup storage error:', await response.text());
+      }
+
+      return response.ok;
+    } catch (e) {
+      console.error('Sync diary backup storage exception:', e);
+      return false;
     }
   }
 
