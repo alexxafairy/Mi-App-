@@ -124,7 +124,7 @@ class DatabaseService {
           emociones: d.emociones,
           pensamientosAutomaticos: d.pensamientos_automaticos ?? d.pensamientosAutomaticos ?? '',
           insight: d.insight,
-          createdAt: Number(d.created_at_val ?? d.createdAt ?? Date.now())
+          createdAt: Number(d.created_at_val ?? d.createdAt ?? d.created_at ?? Date.now())
         })).sort((a: any, b: any) => b.createdAt - a.createdAt);
       }
       
@@ -232,48 +232,72 @@ class DatabaseService {
 
     try {
       if (type === 'diary') {
-        const snakeCaseBody = data.map((d: any) => ({
-          id: d.id,
-          fecha: d.fecha,
-          situacion: d.situacion,
-          emociones: d.emociones,
-          pensamientos_automaticos: d.pensamientosAutomaticos,
-          insight: d.insight,
-          created_at_val: d.createdAt
-        }));
+        const baseRows = Array.isArray(data) ? data : [];
 
-        const camelCaseBody = data.map((d: any) => ({
-          id: d.id,
-          fecha: d.fecha,
-          situacion: d.situacion,
-          emociones: d.emociones,
-          pensamientosAutomaticos: d.pensamientosAutomaticos,
-          insight: d.insight,
-          createdAt: d.createdAt
-        }));
+        const attempts = [
+          {
+            label: 'snake_case_with_id',
+            body: baseRows.map((d: any) => ({
+              id: d.id,
+              fecha: d.fecha,
+              situacion: d.situacion,
+              emociones: d.emociones,
+              pensamientos_automaticos: d.pensamientosAutomaticos,
+              insight: d.insight,
+              created_at_val: d.createdAt
+            }))
+          },
+          {
+            label: 'snake_case_without_id',
+            body: baseRows.map((d: any) => ({
+              fecha: d.fecha,
+              situacion: d.situacion,
+              emociones: d.emociones,
+              pensamientos_automaticos: d.pensamientosAutomaticos,
+              insight: d.insight,
+              created_at_val: d.createdAt
+            }))
+          },
+          {
+            label: 'camelCase_with_id',
+            body: baseRows.map((d: any) => ({
+              id: d.id,
+              fecha: d.fecha,
+              situacion: d.situacion,
+              emociones: d.emociones,
+              pensamientosAutomaticos: d.pensamientosAutomaticos,
+              insight: d.insight,
+              createdAt: d.createdAt
+            }))
+          },
+          {
+            label: 'camelCase_without_id',
+            body: baseRows.map((d: any) => ({
+              fecha: d.fecha,
+              situacion: d.situacion,
+              emociones: d.emociones,
+              pensamientosAutomaticos: d.pensamientosAutomaticos,
+              insight: d.insight,
+              createdAt: d.createdAt
+            }))
+          }
+        ];
 
-        const snakeResponse = await fetch(`${this.config.url}/rest/v1/diary`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(snakeCaseBody)
-        });
+        for (const attempt of attempts) {
+          const response = await fetch(`${this.config.url}/rest/v1/diary`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(attempt.body)
+          });
 
-        if (snakeResponse.ok) return true;
+          if (response.ok) {
+            return true;
+          }
 
-        const snakeError = await snakeResponse.text();
-        console.error('Sync error on diary (snake_case):', snakeError);
-
-        const camelResponse = await fetch(`${this.config.url}/rest/v1/diary`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(camelCaseBody)
-        });
-
-        if (!camelResponse.ok) {
-          console.error('Sync error on diary (camelCase fallback):', await camelResponse.text());
+          console.error(`Sync error on diary (${attempt.label}):`, await response.text());
         }
 
-        return camelResponse.ok;
+        return false;
       }
 
       const body = type === 'diet' ? { id: 1, plan: data } : data;
