@@ -225,19 +225,14 @@ class DatabaseService {
   async syncToCloud(type: 'diary' | 'diet' | 'evidences', data: any) {
     if (!this.config.enabled || !this.config.url) return false;
     
-    try {
-      let body;
-      const headers: any = { 
-        ...this.getHeaders(), 
-        'Prefer': 'resolution=merge-duplicates' 
-      };
+    const headers: any = { 
+      ...this.getHeaders(), 
+      'Prefer': 'resolution=merge-duplicates' 
+    };
 
-      if (type === 'diet') {
-        body = { id: 1, plan: data };
-      } else if (type === 'evidences') {
-        body = data; 
-      } else if (type === 'diary') {
-        body = data.map((d: any) => ({
+    try {
+      if (type === 'diary') {
+        const snakeCaseBody = data.map((d: any) => ({
           id: d.id,
           fecha: d.fecha,
           situacion: d.situacion,
@@ -246,11 +241,46 @@ class DatabaseService {
           insight: d.insight,
           created_at_val: d.createdAt
         }));
+
+        const camelCaseBody = data.map((d: any) => ({
+          id: d.id,
+          fecha: d.fecha,
+          situacion: d.situacion,
+          emociones: d.emociones,
+          pensamientosAutomaticos: d.pensamientosAutomaticos,
+          insight: d.insight,
+          createdAt: d.createdAt
+        }));
+
+        const snakeResponse = await fetch(`${this.config.url}/rest/v1/diary`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(snakeCaseBody)
+        });
+
+        if (snakeResponse.ok) return true;
+
+        const snakeError = await snakeResponse.text();
+        console.error('Sync error on diary (snake_case):', snakeError);
+
+        const camelResponse = await fetch(`${this.config.url}/rest/v1/diary`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(camelCaseBody)
+        });
+
+        if (!camelResponse.ok) {
+          console.error('Sync error on diary (camelCase fallback):', await camelResponse.text());
+        }
+
+        return camelResponse.ok;
       }
+
+      const body = type === 'diet' ? { id: 1, plan: data } : data;
 
       const response = await fetch(`${this.config.url}/rest/v1/${type}`, {
         method: 'POST',
-        headers: headers,
+        headers,
         body: JSON.stringify(body)
       });
 
