@@ -1,4 +1,3 @@
-
 import { DiaryEntry, DietPlan, EvidenceEntry } from "../types";
 
 export interface CloudConfig {
@@ -224,20 +223,16 @@ class DatabaseService {
 
   async syncToCloud(type: 'diary' | 'diet' | 'evidences', data: any) {
     if (!this.config.enabled || !this.config.url) return false;
-    
-    const headers: any = { 
-      ...this.getHeaders(), 
-      'Prefer': 'resolution=merge-duplicates' 
-    };
 
     try {
       if (type === 'diary') {
-        const baseRows = Array.isArray(data) ? data : [];
+        const rows = Array.isArray(data) ? data : [];
+        let allRowsSynced = true;
 
-        const attempts = [
+        const buildPayloads = (d: any) => ([
           {
             label: 'snake_case_with_id',
-            body: baseRows.map((d: any) => ({
+            body: {
               id: d.id,
               fecha: d.fecha,
               situacion: d.situacion,
@@ -245,22 +240,22 @@ class DatabaseService {
               pensamientos_automaticos: d.pensamientosAutomaticos,
               insight: d.insight,
               created_at_val: d.createdAt
-            }))
+            }
           },
           {
             label: 'snake_case_without_id',
-            body: baseRows.map((d: any) => ({
+            body: {
               fecha: d.fecha,
               situacion: d.situacion,
               emociones: d.emociones,
               pensamientos_automaticos: d.pensamientosAutomaticos,
               insight: d.insight,
               created_at_val: d.createdAt
-            }))
+            }
           },
           {
             label: 'camelCase_with_id',
-            body: baseRows.map((d: any) => ({
+            body: {
               id: d.id,
               fecha: d.fecha,
               situacion: d.situacion,
@@ -268,37 +263,102 @@ class DatabaseService {
               pensamientosAutomaticos: d.pensamientosAutomaticos,
               insight: d.insight,
               createdAt: d.createdAt
-            }))
+            }
           },
           {
             label: 'camelCase_without_id',
-            body: baseRows.map((d: any) => ({
+            body: {
               fecha: d.fecha,
               situacion: d.situacion,
               emociones: d.emociones,
               pensamientosAutomaticos: d.pensamientosAutomaticos,
               insight: d.insight,
               createdAt: d.createdAt
-            }))
+            }
           }
-        ];
+        ]);
 
-        for (const attempt of attempts) {
-          const response = await fetch(`${this.config.url}/rest/v1/diary`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(attempt.body)
-          });
+        for (const row of rows) {
+          let syncedThisRow = false;
 
-          if (response.ok) {
-            return true;
+          if (row?.id) {
+            const patchAttempts = [
+              {
+                label: 'patch_snake_case_by_id',
+                body: {
+                  fecha: row.fecha,
+                  situacion: row.situacion,
+                  emociones: row.emociones,
+                  pensamientos_automaticos: row.pensamientosAutomaticos,
+                  insight: row.insight,
+                  created_at_val: row.createdAt
+                }
+              },
+              {
+                label: 'patch_camelCase_by_id',
+                body: {
+                  fecha: row.fecha,
+                  situacion: row.situacion,
+                  emociones: row.emociones,
+                  pensamientosAutomaticos: row.pensamientosAutomaticos,
+                  insight: row.insight,
+                  createdAt: row.createdAt
+                }
+              }
+            ];
+
+            for (const attempt of patchAttempts) {
+              const response = await fetch(`${this.config.url}/rest/v1/diary?id=eq.${encodeURIComponent(String(row.id))}`, {
+                method: 'PATCH',
+                headers: {
+                  ...this.getHeaders(),
+                  'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(attempt.body)
+              });
+
+              if (response.ok) {
+                const updatedRows = await response.json().catch(() => []);
+                if (Array.isArray(updatedRows) && updatedRows.length > 0) {
+                  syncedThisRow = true;
+                  break;
+                }
+              }
+            }
           }
 
-          console.error(`Sync error on diary (${attempt.label}):`, await response.text());
+          if (syncedThisRow) continue;
+
+          for (const attempt of buildPayloads(row)) {
+            const response = await fetch(`${this.config.url}/rest/v1/diary`, {
+              method: 'POST',
+              headers: {
+                ...this.getHeaders(),
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify(attempt.body)
+            });
+
+            if (response.ok) {
+              syncedThisRow = true;
+              break;
+            }
+
+            console.error(`Sync error on diary (${attempt.label}):`, await response.text());
+          }
+
+          if (!syncedThisRow) {
+            allRowsSynced = false;
+          }
         }
 
-        return false;
+        return allRowsSynced;
       }
+
+      const headers: any = {
+        ...this.getHeaders(),
+        'Prefer': 'resolution=merge-duplicates'
+      };
 
       const body = type === 'diet' ? { id: 1, plan: data } : data;
 
