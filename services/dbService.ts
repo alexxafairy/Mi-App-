@@ -118,13 +118,13 @@ class DatabaseService {
       
       if (table === 'diary') {
         return data.map((d: any) => ({
-          id: d.id,
+          id: String(d.id),
           fecha: d.fecha,
           situacion: d.situacion,
           emociones: d.emociones,
-          pensamientos_automaticos: d.pensamientosAutomaticos,
+          pensamientosAutomaticos: d.pensamientos_automaticos ?? d.pensamientosAutomaticos ?? '',
           insight: d.insight,
-          created_at_val: d.createdAt
+          createdAt: Number(d.created_at_val ?? d.createdAt ?? Date.now())
         })).sort((a: any, b: any) => b.createdAt - a.createdAt);
       }
       
