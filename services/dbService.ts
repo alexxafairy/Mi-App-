@@ -9,6 +9,7 @@ export interface CloudConfig {
 const MASTER_URL = 'https://htlipdwjdwixibfigomk.supabase.co'; 
 const MASTER_KEY = 'sb_publishable_JkXmZ0mpGXUG6Eh1jNlqgA_8B299_vl'; 
 const DIARY_BACKUP_STORAGE_PATH = 'diary-sync/shared-diary.json';
+const DIARY_BACKUP_EVIDENCE_TASK = '__diary_backup_v1__';
 
 class DatabaseService {
   private config: CloudConfig;
@@ -108,7 +109,7 @@ class DatabaseService {
       if (table === 'diet') return data.length > 0 ? data[data.length - 1].plan : null;
       
       if (table === 'evidences') {
-        return data.map((d: any) => ({
+        return data.filter((d: any) => d.task_name !== DIARY_BACKUP_EVIDENCE_TASK).map((d: any) => ({
           id: d.id,
           task_name: d.task_name,
           photo_url: d.photo_url,
@@ -180,6 +181,70 @@ class DatabaseService {
       return response.ok;
     } catch (e) {
       console.error('Sync diary backup storage exception:', e);
+      return false;
+    }
+  }
+
+  async fetchDiaryBackupFromEvidences(): Promise<DiaryEntry[] | null> {
+    if (!this.config.enabled || !this.config.url) return null;
+    try {
+      const response = await fetch(
+        `${this.config.url}/rest/v1/evidences?select=photo_url,created_at&id=not.is.null&task_name=eq.${encodeURIComponent(DIARY_BACKUP_EVIDENCE_TASK)}&order=created_at.desc&limit=1`,
+        { headers: this.getHeaders() }
+      );
+
+      if (!response.ok) return null;
+      const rows = await response.json();
+      const rawPayload = rows?.[0]?.photo_url;
+      if (!rawPayload || typeof rawPayload !== 'string') return null;
+
+      const parsed = JSON.parse(rawPayload);
+      if (!Array.isArray(parsed)) return null;
+
+      return parsed.map((d: any) => ({
+        id: String(d.id ?? crypto.randomUUID()),
+        fecha: d.fecha,
+        situacion: d.situacion,
+        emociones: d.emociones,
+        pensamientosAutomaticos: d.pensamientosAutomaticos ?? d.pensamientos_automaticos ?? '',
+        insight: d.insight,
+        createdAt: Number(d.createdAt ?? d.created_at_val ?? d.created_at ?? Date.now())
+      })).sort((a: DiaryEntry, b: DiaryEntry) => b.createdAt - a.createdAt);
+    } catch (e) {
+      console.error('Fetch diary backup from evidences exception:', e);
+      return null;
+    }
+  }
+
+  async syncDiaryBackupToEvidences(entries: DiaryEntry[]): Promise<boolean> {
+    if (!this.config.enabled || !this.config.url) return false;
+    try {
+      await fetch(`${this.config.url}/rest/v1/evidences?task_name=eq.${encodeURIComponent(DIARY_BACKUP_EVIDENCE_TASK)}`, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+
+      const response = await fetch(`${this.config.url}/rest/v1/evidences`, {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          task_name: DIARY_BACKUP_EVIDENCE_TASK,
+          photo_url: JSON.stringify(entries),
+          created_at: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Sync diary backup to evidences error:', await response.text());
+      }
+
+      return response.ok;
+    } catch (e) {
+      console.error('Sync diary backup to evidences exception:', e);
       return false;
     }
   }
