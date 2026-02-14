@@ -229,85 +229,83 @@ class DatabaseService {
         const rows = Array.isArray(data) ? data : [];
         let allRowsSynced = true;
 
-        const buildPayloads = (d: any) => ([
-          {
-            label: 'snake_case_with_id',
-            body: {
-              id: d.id,
-              fecha: d.fecha,
-              situacion: d.situacion,
-              emociones: d.emociones,
-              pensamientos_automaticos: d.pensamientosAutomaticos,
-              insight: d.insight,
-              created_at_val: d.createdAt
-            }
-          },
-          {
-            label: 'snake_case_without_id',
-            body: {
-              fecha: d.fecha,
-              situacion: d.situacion,
-              emociones: d.emociones,
-              pensamientos_automaticos: d.pensamientosAutomaticos,
-              insight: d.insight,
-              created_at_val: d.createdAt
-            }
-          },
-          {
-            label: 'camelCase_with_id',
-            body: {
-              id: d.id,
-              fecha: d.fecha,
-              situacion: d.situacion,
-              emociones: d.emociones,
-              pensamientosAutomaticos: d.pensamientosAutomaticos,
-              insight: d.insight,
-              createdAt: d.createdAt
-            }
-          },
-          {
-            label: 'camelCase_without_id',
-            body: {
-              fecha: d.fecha,
-              situacion: d.situacion,
-              emociones: d.emociones,
-              pensamientosAutomaticos: d.pensamientosAutomaticos,
-              insight: d.insight,
-              createdAt: d.createdAt
-            }
-          }
-        ]);
+        const clean = (obj: Record<string, any>) => {
+          const next: Record<string, any> = {};
+          Object.entries(obj).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) next[key] = value;
+          });
+          return next;
+        };
+
+        const asIsoDate = (value: any) => {
+          const num = Number(value);
+          if (!Number.isFinite(num)) return undefined;
+          return new Date(num).toISOString();
+        };
+
+        const postAttemptsForRow = (d: any) => {
+          const createdIso = asIsoDate(d.createdAt);
+          const baseSnake = {
+            fecha: d.fecha,
+            situacion: d.situacion,
+            emociones: d.emociones,
+            pensamientos_automaticos: d.pensamientosAutomaticos,
+            insight: d.insight
+          };
+
+          const baseCamel = {
+            fecha: d.fecha,
+            situacion: d.situacion,
+            emociones: d.emociones,
+            pensamientosAutomaticos: d.pensamientosAutomaticos,
+            insight: d.insight
+          };
+
+          return [
+            { label: 'post_snake_no_id_no_created', body: clean(baseSnake) },
+            { label: 'post_snake_no_id_created_number', body: clean({ ...baseSnake, created_at_val: d.createdAt }) },
+            { label: 'post_snake_no_id_created_iso', body: clean({ ...baseSnake, created_at_val: createdIso }) },
+            { label: 'post_camel_no_id_no_created', body: clean(baseCamel) },
+            { label: 'post_camel_no_id_created_number', body: clean({ ...baseCamel, createdAt: d.createdAt }) },
+            { label: 'post_camel_no_id_created_iso', body: clean({ ...baseCamel, createdAt: createdIso }) },
+            { label: 'post_snake_with_id_no_created', body: clean({ id: d.id, ...baseSnake }) },
+            { label: 'post_camel_with_id_no_created', body: clean({ id: d.id, ...baseCamel }) }
+          ];
+        };
+
+        const patchAttemptsForRow = (d: any) => {
+          const createdIso = asIsoDate(d.createdAt);
+          const snake = {
+            fecha: d.fecha,
+            situacion: d.situacion,
+            emociones: d.emociones,
+            pensamientos_automaticos: d.pensamientosAutomaticos,
+            insight: d.insight
+          };
+
+          const camel = {
+            fecha: d.fecha,
+            situacion: d.situacion,
+            emociones: d.emociones,
+            pensamientosAutomaticos: d.pensamientosAutomaticos,
+            insight: d.insight
+          };
+
+          return [
+            { label: 'patch_snake_no_created', body: clean(snake) },
+            { label: 'patch_snake_created_number', body: clean({ ...snake, created_at_val: d.createdAt }) },
+            { label: 'patch_snake_created_iso', body: clean({ ...snake, created_at_val: createdIso }) },
+            { label: 'patch_camel_no_created', body: clean(camel) },
+            { label: 'patch_camel_created_number', body: clean({ ...camel, createdAt: d.createdAt }) },
+            { label: 'patch_camel_created_iso', body: clean({ ...camel, createdAt: createdIso }) }
+          ];
+        };
 
         for (const row of rows) {
           let syncedThisRow = false;
 
           if (row?.id) {
-            const patchAttempts = [
-              {
-                label: 'patch_snake_case_by_id',
-                body: {
-                  fecha: row.fecha,
-                  situacion: row.situacion,
-                  emociones: row.emociones,
-                  pensamientos_automaticos: row.pensamientosAutomaticos,
-                  insight: row.insight,
-                  created_at_val: row.createdAt
-                }
-              },
-              {
-                label: 'patch_camelCase_by_id',
-                body: {
-                  fecha: row.fecha,
-                  situacion: row.situacion,
-                  emociones: row.emociones,
-                  pensamientosAutomaticos: row.pensamientosAutomaticos,
-                  insight: row.insight,
-                  createdAt: row.createdAt
-                }
-              }
-            ];
-
-            for (const attempt of patchAttempts) {
+            for (const attempt of patchAttemptsForRow(row)) {
               const response = await fetch(`${this.config.url}/rest/v1/diary?id=eq.${encodeURIComponent(String(row.id))}`, {
                 method: 'PATCH',
                 headers: {
@@ -324,12 +322,14 @@ class DatabaseService {
                   break;
                 }
               }
+
+              console.error(`Sync error on diary (${attempt.label}):`, await response.text());
             }
           }
 
           if (syncedThisRow) continue;
 
-          for (const attempt of buildPayloads(row)) {
+          for (const attempt of postAttemptsForRow(row)) {
             const response = await fetch(`${this.config.url}/rest/v1/diary`, {
               method: 'POST',
               headers: {
