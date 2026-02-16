@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AppTab, DiaryEntry, DietPlan, EvidenceEntry } from './types';
-import DiarySection from './components/DiarySection';
-import DietSection from './components/DietSection';
-import SummarySection from './components/SummarySection';
-import EvidenceSection from './components/EvidenceSection';
 import { db } from './services/dbService';
+
+const DiarySection = lazy(() => import('./components/DiarySection'));
+const DietSection = lazy(() => import('./components/DietSection'));
+const SummarySection = lazy(() => import('./components/SummarySection'));
+const EvidenceSection = lazy(() => import('./components/EvidenceSection'));
 import { Star22, Star8 } from './icons/Stars';
 
 const USER_PHOTO = "https://i.postimg.cc/5yDwTwRh/frente.png";
@@ -266,30 +267,32 @@ const App: React.FC = () => {
           <TabButton active={activeTab === AppTab.SUMMARY} onClick={() => setActiveTab(AppTab.SUMMARY)} label="RESUMEN" icon="📊" />
         </div>
 
-        <div className="animate-in">
-          {activeTab === AppTab.DIARY && <DiarySection entries={diaryEntries} onUpdate={saveDiary} onDelete={deleteDiaryEntry} />}
-          {activeTab === AppTab.DIET && <DietSection plan={dietPlan} onUpdate={saveDiet} />}
-          {activeTab === AppTab.EVIDENCES && (
-            <EvidenceSection 
-              entries={evidenceEntries} 
-              onAdd={addEvidence} 
-              onDelete={deleteEvidence} 
-              onRefresh={initApp} 
-            />
-          )}
-          {activeTab === AppTab.SUMMARY && (
-            <SummarySection 
-              diaryEntries={diaryEntries} 
-              dietPlan={dietPlan} 
-              onImport={(data) => {
-                saveDiary(data.diary);
-                if (data.diet) saveDiet(data.diet);
-                window.location.reload();
-              }}
-              onCloudStatusChange={setIsCloudEnabled}
-            />
-          )}
-        </div>
+        <Suspense fallback={<div className="text-center py-12 text-sm font-bold uppercase tracking-widest opacity-40">Cargando...</div>}>
+          <div className="animate-in">
+            {activeTab === AppTab.DIARY && <DiarySection entries={diaryEntries} onUpdate={saveDiary} onDelete={deleteDiaryEntry} />}
+            {activeTab === AppTab.DIET && <DietSection plan={dietPlan} onUpdate={saveDiet} />}
+            {activeTab === AppTab.EVIDENCES && (
+              <EvidenceSection
+                entries={evidenceEntries}
+                onAdd={addEvidence}
+                onDelete={deleteEvidence}
+                onRefresh={initApp}
+              />
+            )}
+            {activeTab === AppTab.SUMMARY && (
+              <SummarySection
+                diaryEntries={diaryEntries}
+                dietPlan={dietPlan}
+                onImport={(data) => {
+                  saveDiary(data.diary);
+                  if (data.diet) saveDiet(data.diet);
+                  window.location.reload();
+                }}
+                onCloudStatusChange={setIsCloudEnabled}
+              />
+            )}
+          </div>
+        </Suspense>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-[3px] border-black flex justify-around py-4 md:hidden z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.1)]">
