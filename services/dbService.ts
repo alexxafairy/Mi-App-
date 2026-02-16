@@ -1,4 +1,5 @@
 import { DiaryEntry, DietPlan, EvidenceEntry } from "../types";
+import { config } from "../config";
 
 export interface CloudConfig {
   url: string;
@@ -6,8 +7,8 @@ export interface CloudConfig {
   enabled: boolean;
 }
 
-const MASTER_URL = 'https://htlipdwjdwixibfigomk.supabase.co'; 
-const MASTER_KEY = 'sb_publishable_JkXmZ0mpGXUG6Eh1jNlqgA_8B299_vl'; 
+const MASTER_URL = config.supabase.url;
+const MASTER_KEY = config.supabase.key;
 const DIARY_BACKUP_STORAGE_PATH = 'diary-sync/shared-diary.json';
 const DIARY_BACKUP_EVIDENCE_TASK = '__diary_backup_v1__';
 
@@ -436,9 +437,9 @@ class DatabaseService {
                   syncedThisRow = true;
                   break;
                 }
+              } else {
+                console.error(`Sync error on diary (${attempt.label}):`, await response.text());
               }
-
-              console.error(`Sync error on diary (${attempt.label}):`, await response.text());
             }
           }
 

@@ -1,15 +1,15 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { DietPlan, DiaryEntry } from "../types";
+import { config } from "../config";
 
-// Always initialize with apiKey from process.env.API_KEY as required by guidelines
 const getAI = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return new GoogleGenAI({ apiKey: config.gemini.apiKey });
 };
 
 const MEAL_KEYWORDS = ['desayuno', 'comida', 'cena', 'colación', 'colacion', 'snack', 'almuerzo'];
 
-const mapMealCategory = (label: string): 'breakfast' | 'snack' | 'lunch' | 'dinner' | 'other' => {
+export const mapMealCategory = (label: string): 'breakfast' | 'snack' | 'lunch' | 'dinner' | 'other' => {
   const v = label.toLowerCase();
   if (v.includes('desayuno')) return 'breakfast';
   if (v.includes('colación') || v.includes('colacion') || v.includes('snack')) return 'snack';
@@ -22,7 +22,7 @@ const mapMealCategory = (label: string): 'breakfast' | 'snack' | 'lunch' | 'dinn
  * Parser determinista local para formatos estructurados en texto plano.
  * Útil para dietas con formato "DÍA X / SEMANA Y / Comida: ..."
  */
-const parseDietStructuredText = (text: string): DietPlan | null => {
+export const parseDietStructuredText = (text: string): DietPlan | null => {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) return null;
 
@@ -235,5 +235,5 @@ export const generateClaymationVideo = async (task: string): Promise<string> => 
   const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
   if (!downloadLink) throw new Error("Video generation failed.");
   
-  return `${downloadLink}&key=${process.env.API_KEY}`;
+  return `${downloadLink}&key=${config.gemini.apiKey}`;
 };

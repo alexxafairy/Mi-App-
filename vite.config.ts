@@ -9,11 +9,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
-  define: {
-    'process.env': {
-      API_KEY: JSON.stringify(process.env.API_KEY || '')
-    }
-  },
   resolve: {
     alias: {
       'lucide-react': path.resolve(__dirname, 'shims/lucide-react.tsx'),
