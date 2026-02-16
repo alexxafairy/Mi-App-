@@ -6,11 +6,11 @@ import type { DiaryEntry, EvidenceEntry, DietPlan } from '../types';
  * E2E tests against real Supabase.
  * Every test creates dummy data with a unique marker and cleans up in afterAll.
  *
- * Schema notes (discovered via probing):
- *   diary   → id (text, required), fecha, situacion, emociones,
- *             pensamientosautomaticos (all-lowercase), insight, createdat
- *   evidences → id (uuid), task_name, photo_url, created_at
- *   diet    → id (int, always 1), plan (jsonb)
+ * After drizzle-kit push, the diary table uses proper snake_case columns:
+ *   diary     → id (uuid), fecha, situacion, emociones,
+ *               pensamientos_automaticos, insight, created_at (bigint)
+ *   evidences → id (uuid), task_name, photo_url, created_at (timestamptz)
+ *   diet      → id (int), plan (jsonb)
  */
 
 const E2E_MARKER = `__e2e_${Date.now()}__`;
@@ -18,30 +18,6 @@ const E2E_MARKER = `__e2e_${Date.now()}__`;
 const createdDiaryIds: string[] = [];
 const createdEvidenceIds: (string | number)[] = [];
 let originalDiet: any = undefined;
-
-/** Insert a diary row using the real column names so the POST doesn't fail. */
-async function insertDiaryDirect(entry: DiaryEntry): Promise<boolean> {
-  const cfg = db.getConfig();
-  const res = await fetch(`${cfg.url}/rest/v1/diary`, {
-    method: 'POST',
-    headers: {
-      apikey: cfg.key,
-      Authorization: `Bearer ${cfg.key}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-    },
-    body: JSON.stringify({
-      id: entry.id,
-      fecha: entry.fecha,
-      situacion: entry.situacion,
-      emociones: entry.emociones,
-      pensamientosautomaticos: entry.pensamientosAutomaticos,
-      insight: entry.insight,
-      createdat: entry.createdAt,
-    }),
-  });
-  return res.ok;
-}
 
 describe('DatabaseService e2e', { timeout: 30_000 }, () => {
   beforeAll(() => {
@@ -83,8 +59,8 @@ describe('DatabaseService e2e', { timeout: 30_000 }, () => {
       createdAt: Date.now(),
     };
 
-    it('inserts a diary entry', async () => {
-      const ok = await insertDiaryDirect(dummyEntry);
+    it('inserts a diary entry via syncToCloud', async () => {
+      const ok = await db.syncToCloud('diary', [dummyEntry]);
       expect(ok).toBe(true);
       createdDiaryIds.push(dummyEntry.id);
     });
@@ -96,8 +72,20 @@ describe('DatabaseService e2e', { timeout: 30_000 }, () => {
       expect(found).toBeDefined();
       expect(found!.situacion).toBe(dummyEntry.situacion);
       expect(found!.emociones).toBe(dummyEntry.emociones);
+      expect(found!.pensamientosAutomaticos).toBe(dummyEntry.pensamientosAutomaticos);
       expect(typeof found!.id).toBe('string');
       expect(typeof found!.createdAt).toBe('number');
+    });
+
+    it('updates a diary entry via syncToCloud', async () => {
+      const updated = { ...dummyEntry, insight: 'updated insight' };
+      const ok = await db.syncToCloud('diary', [updated]);
+      expect(ok).toBe(true);
+
+      const entries: DiaryEntry[] = await db.fetchFromCloud('diary');
+      const found = entries.find((e) => e.situacion.includes(E2E_MARKER));
+      expect(found).toBeDefined();
+      expect(found!.insight).toBe('updated insight');
     });
 
     it('deletes the diary entry', async () => {
@@ -108,7 +96,6 @@ describe('DatabaseService e2e', { timeout: 30_000 }, () => {
       const found = entries.find((e) => e.situacion.includes(E2E_MARKER));
       expect(found).toBeUndefined();
 
-      // Already cleaned up — remove from afterAll list
       createdDiaryIds.splice(createdDiaryIds.indexOf(dummyEntry.id), 1);
     });
   });
@@ -140,10 +127,6 @@ describe('DatabaseService e2e', { timeout: 30_000 }, () => {
       expect(createdEvidenceIds.length).toBeGreaterThan(0);
       const id = createdEvidenceIds[0];
 
-      // deleteFromCloud returns response.ok — PostgREST returns 200 even when
-      // RLS silently filters the row, so the call "succeeds" but the row may
-      // persist. This matches production behavior where the app hides entries
-      // locally via localStorage when cloud deletion is blocked.
       const ok = await db.deleteFromCloud('evidences', id);
       expect(ok).toBe(true);
     });

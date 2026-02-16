@@ -1,4 +1,6 @@
+import type { DiaryRow, EvidenceRow } from './db/schema';
 
+/** Maps snake_case DB row to camelCase app interface */
 export interface DiaryEntry {
   id: string;
   fecha: string;
@@ -8,6 +10,9 @@ export interface DiaryEntry {
   insight?: string;
   createdAt: number;
 }
+
+/** Re-export DB row type for direct DB usage */
+export type { DiaryRow, EvidenceRow };
 
 export interface Meal {
   time: string;

@@ -12,6 +12,34 @@ const MASTER_KEY = config.supabase.key;
 const DIARY_BACKUP_STORAGE_PATH = 'diary-sync/shared-diary.json';
 const DIARY_BACKUP_EVIDENCE_TASK = '__diary_backup_v1__';
 
+/** Convert a camelCase DiaryEntry to the snake_case DB columns defined in db/schema.ts */
+function diaryToRow(d: DiaryEntry | Record<string, any>): Record<string, any> {
+  const row: Record<string, any> = {
+    fecha: d.fecha,
+    situacion: d.situacion,
+    emociones: d.emociones,
+    pensamientos_automaticos: d.pensamientosAutomaticos,
+    insight: d.insight,
+    created_at: d.createdAt,
+  };
+  if (d.id) row.id = d.id;
+  // Strip undefined values
+  return Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined && v !== null));
+}
+
+/** Convert a snake_case DB row to camelCase DiaryEntry */
+function rowToDiary(d: Record<string, any>): DiaryEntry {
+  return {
+    id: String(d.id),
+    fecha: d.fecha,
+    situacion: d.situacion,
+    emociones: d.emociones,
+    pensamientosAutomaticos: d.pensamientos_automaticos ?? '',
+    insight: d.insight,
+    createdAt: Number(d.created_at ?? Date.now()),
+  };
+}
+
 class DatabaseService {
   private config: CloudConfig;
 
@@ -20,10 +48,10 @@ class DatabaseService {
     if (saved) {
       this.config = JSON.parse(saved);
     } else {
-      this.config = { 
-        url: MASTER_URL, 
-        key: MASTER_KEY, 
-        enabled: !!(MASTER_URL && MASTER_KEY) 
+      this.config = {
+        url: MASTER_URL,
+        key: MASTER_KEY,
+        enabled: !!(MASTER_URL && MASTER_KEY)
       };
     }
   }
@@ -43,10 +71,10 @@ class DatabaseService {
 
   resetToMaster() {
     localStorage.clear();
-    this.config = { 
-      url: MASTER_URL, 
-      key: MASTER_KEY, 
-      enabled: !!(MASTER_URL && MASTER_KEY) 
+    this.config = {
+      url: MASTER_URL,
+      key: MASTER_KEY,
+      enabled: !!(MASTER_URL && MASTER_KEY)
     };
     localStorage.setItem('clayminds_cloud_config', JSON.stringify(this.config));
     window.location.reload();
@@ -99,16 +127,16 @@ class DatabaseService {
       const response = await fetch(`${this.config.url}/rest/v1/${table}?select=*`, {
         headers: this.getHeaders()
       });
-      
+
       if (!response.ok) {
         console.error(`Fetch error from ${table}:`, await response.text());
         return table === 'diet' ? null : [];
       }
-      
+
       const data = await response.json();
-      
+
       if (table === 'diet') return data.length > 0 ? data[data.length - 1].plan : null;
-      
+
       if (table === 'evidences') {
         return data.filter((d: any) => d.task_name !== DIARY_BACKUP_EVIDENCE_TASK).map((d: any) => ({
           id: d.id,
@@ -117,19 +145,12 @@ class DatabaseService {
           created_at: d.created_at
         })).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       }
-      
+
       if (table === 'diary') {
-        return data.map((d: any) => ({
-          id: String(d.id),
-          fecha: d.fecha,
-          situacion: d.situacion,
-          emociones: d.emociones,
-          pensamientosAutomaticos: d.pensamientos_automaticos ?? d.pensamientosAutomaticos ?? '',
-          insight: d.insight,
-          createdAt: Number(d.created_at_val ?? d.createdAt ?? d.created_at ?? Date.now())
-        })).sort((a: any, b: any) => b.createdAt - a.createdAt);
+        return data.map(rowToDiary)
+          .sort((a: DiaryEntry, b: DiaryEntry) => b.createdAt - a.createdAt);
       }
-      
+
       return data;
     } catch (e) {
       console.error(`Exception fetching ${table}:`, e);
@@ -153,7 +174,7 @@ class DatabaseService {
         emociones: d.emociones,
         pensamientosAutomaticos: d.pensamientosAutomaticos ?? d.pensamientos_automaticos ?? '',
         insight: d.insight,
-        createdAt: Number(d.createdAt ?? d.created_at_val ?? d.created_at ?? Date.now())
+        createdAt: Number(d.createdAt ?? d.created_at ?? Date.now())
       })).sort((a: DiaryEntry, b: DiaryEntry) => b.createdAt - a.createdAt);
     } catch (e) {
       console.error('Fetch diary backup exception:', e);
@@ -209,7 +230,7 @@ class DatabaseService {
         emociones: d.emociones,
         pensamientosAutomaticos: d.pensamientosAutomaticos ?? d.pensamientos_automaticos ?? '',
         insight: d.insight,
-        createdAt: Number(d.createdAt ?? d.created_at_val ?? d.created_at ?? Date.now())
+        createdAt: Number(d.createdAt ?? d.created_at ?? Date.now())
       })).sort((a: DiaryEntry, b: DiaryEntry) => b.createdAt - a.createdAt);
     } catch (e) {
       console.error('Fetch diary backup from evidences exception:', e);
@@ -345,127 +366,50 @@ class DatabaseService {
         const rows = Array.isArray(data) ? data : [];
         let allRowsSynced = true;
 
-        const clean = (obj: Record<string, any>) => {
-          const next: Record<string, any> = {};
-          Object.entries(obj).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) next[key] = value;
-          });
-          return next;
-        };
+        for (const entry of rows) {
+          let synced = false;
+          const row = diaryToRow(entry);
 
-        const asIsoDate = (value: any) => {
-          const num = Number(value);
-          if (!Number.isFinite(num)) return undefined;
-          return new Date(num).toISOString();
-        };
+          // Try PATCH if entry has an id
+          if (entry?.id) {
+            const response = await fetch(`${this.config.url}/rest/v1/diary?id=eq.${encodeURIComponent(String(entry.id))}`, {
+              method: 'PATCH',
+              headers: {
+                ...this.getHeaders(),
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify(row)
+            });
 
-        const postAttemptsForRow = (d: any) => {
-          const createdIso = asIsoDate(d.createdAt);
-          const baseSnake = {
-            fecha: d.fecha,
-            situacion: d.situacion,
-            emociones: d.emociones,
-            pensamientos_automaticos: d.pensamientosAutomaticos,
-            insight: d.insight
-          };
-
-          const baseCamel = {
-            fecha: d.fecha,
-            situacion: d.situacion,
-            emociones: d.emociones,
-            pensamientosAutomaticos: d.pensamientosAutomaticos,
-            insight: d.insight
-          };
-
-          return [
-            { label: 'post_snake_no_id_no_created', body: clean(baseSnake) },
-            { label: 'post_snake_no_id_created_number', body: clean({ ...baseSnake, created_at_val: d.createdAt }) },
-            { label: 'post_snake_no_id_created_iso', body: clean({ ...baseSnake, created_at_val: createdIso }) },
-            { label: 'post_camel_no_id_no_created', body: clean(baseCamel) },
-            { label: 'post_camel_no_id_created_number', body: clean({ ...baseCamel, createdAt: d.createdAt }) },
-            { label: 'post_camel_no_id_created_iso', body: clean({ ...baseCamel, createdAt: createdIso }) },
-            { label: 'post_snake_with_id_no_created', body: clean({ id: d.id, ...baseSnake }) },
-            { label: 'post_camel_with_id_no_created', body: clean({ id: d.id, ...baseCamel }) }
-          ];
-        };
-
-        const patchAttemptsForRow = (d: any) => {
-          const createdIso = asIsoDate(d.createdAt);
-          const snake = {
-            fecha: d.fecha,
-            situacion: d.situacion,
-            emociones: d.emociones,
-            pensamientos_automaticos: d.pensamientosAutomaticos,
-            insight: d.insight
-          };
-
-          const camel = {
-            fecha: d.fecha,
-            situacion: d.situacion,
-            emociones: d.emociones,
-            pensamientosAutomaticos: d.pensamientosAutomaticos,
-            insight: d.insight
-          };
-
-          return [
-            { label: 'patch_snake_no_created', body: clean(snake) },
-            { label: 'patch_snake_created_number', body: clean({ ...snake, created_at_val: d.createdAt }) },
-            { label: 'patch_snake_created_iso', body: clean({ ...snake, created_at_val: createdIso }) },
-            { label: 'patch_camel_no_created', body: clean(camel) },
-            { label: 'patch_camel_created_number', body: clean({ ...camel, createdAt: d.createdAt }) },
-            { label: 'patch_camel_created_iso', body: clean({ ...camel, createdAt: createdIso }) }
-          ];
-        };
-
-        for (const row of rows) {
-          let syncedThisRow = false;
-
-          if (row?.id) {
-            for (const attempt of patchAttemptsForRow(row)) {
-              const response = await fetch(`${this.config.url}/rest/v1/diary?id=eq.${encodeURIComponent(String(row.id))}`, {
-                method: 'PATCH',
-                headers: {
-                  ...this.getHeaders(),
-                  'Prefer': 'return=representation'
-                },
-                body: JSON.stringify(attempt.body)
-              });
-
-              if (response.ok) {
-                const updatedRows = await response.json().catch(() => []);
-                if (Array.isArray(updatedRows) && updatedRows.length > 0) {
-                  syncedThisRow = true;
-                  break;
-                }
-              } else {
-                console.error(`Sync error on diary (${attempt.label}):`, await response.text());
+            if (response.ok) {
+              const updated = await response.json().catch(() => []);
+              if (Array.isArray(updated) && updated.length > 0) {
+                synced = true;
               }
+            } else {
+              console.error('Sync diary PATCH error:', await response.text());
             }
           }
 
-          if (syncedThisRow) continue;
-
-          for (const attempt of postAttemptsForRow(row)) {
+          // Fall back to POST
+          if (!synced) {
             const response = await fetch(`${this.config.url}/rest/v1/diary`, {
               method: 'POST',
               headers: {
                 ...this.getHeaders(),
                 'Prefer': 'return=representation'
               },
-              body: JSON.stringify(attempt.body)
+              body: JSON.stringify(row)
             });
 
             if (response.ok) {
-              syncedThisRow = true;
-              break;
+              synced = true;
+            } else {
+              console.error('Sync diary POST error:', await response.text());
             }
-
-            console.error(`Sync error on diary (${attempt.label}):`, await response.text());
           }
 
-          if (!syncedThisRow) {
-            allRowsSynced = false;
-          }
+          if (!synced) allRowsSynced = false;
         }
 
         return allRowsSynced;

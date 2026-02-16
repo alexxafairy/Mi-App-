@@ -87,7 +87,7 @@ describe('DatabaseService', () => {
         emociones: 'happy',
         pensamientos_automaticos: 'thought',
         insight: 'insight text',
-        created_at_val: 1704067200000,
+        created_at: 1704067200000,
       }];
 
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -196,7 +196,42 @@ describe('DatabaseService', () => {
       const result = await db.syncToCloud('diary', entries);
       expect(result).toBe(true);
       const patchCalls = calls.filter(c => c.method === 'PATCH');
-      expect(patchCalls.length).toBeGreaterThan(0);
+      expect(patchCalls.length).toBe(1);
+    });
+
+    it('sends snake_case payload with correct column names', async () => {
+      let capturedBody: any = null;
+
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        if (opts?.method === 'PATCH') {
+          capturedBody = JSON.parse(opts.body);
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve([{ id: '1' }]),
+            text: () => Promise.resolve(''),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([]),
+          text: () => Promise.resolve(''),
+        });
+      }));
+
+      await db.syncToCloud('diary', [{
+        id: '1',
+        fecha: '2024-01-01',
+        situacion: 'test',
+        emociones: 'happy',
+        pensamientosAutomaticos: 'thought',
+        createdAt: 1704067200000,
+      }]);
+
+      expect(capturedBody).toBeDefined();
+      expect(capturedBody.pensamientos_automaticos).toBe('thought');
+      expect(capturedBody.created_at).toBe(1704067200000);
+      expect(capturedBody.pensamientosAutomaticos).toBeUndefined();
+      expect(capturedBody.createdAt).toBeUndefined();
     });
 
     it('uses POST when entry has no id', async () => {
@@ -221,7 +256,8 @@ describe('DatabaseService', () => {
 
       await db.syncToCloud('diary', entries);
       const postCalls = calls.filter(c => c.method === 'POST');
-      expect(postCalls.length).toBeGreaterThan(0);
+      expect(postCalls.length).toBe(1);
+      expect(calls.filter(c => c.method === 'PATCH')).toHaveLength(0);
     });
   });
 });
